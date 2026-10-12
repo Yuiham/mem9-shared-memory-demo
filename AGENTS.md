@@ -12,3 +12,4 @@ A demo that shows how to configure, use and test mem9 shared memory (a Space Cha
 - The real server address lives only in the gitignored `.env`. Keep it, every key and every person's real name out of the repository, test data, docs and command output. Use fictional data.
 - State and person files hold keys: write them owner-only (mode 600) and keep them out of git.
 - Every command that changes anything says what it will change, asks first (or takes `--yes`), and ends with a next step. Errors name the next step too.
+- Documentation is `README.md` plus `docs/`; `docs/participant-guide.md` is also the Kit's README. `src/docs.test.mjs` checks that every guide exists, links resolve, every command has a section in the Administrator guide, and no file holds a real address, home path or key. Update the guide when a command's behavior changes.

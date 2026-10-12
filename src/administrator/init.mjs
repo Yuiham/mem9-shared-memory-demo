@@ -78,6 +78,8 @@ async function createChain({ ctx, person }) {
   const { store, mem9 } = ctx;
   const created = await mem9.createChain(chainNameFor(person.name), `Shared-memory demo Chain for ${person.name}`);
   store.state.chains[person.name] = { id: created.chain.id, name: created.chain.name, key: created.chain_api_key, nodes: [] };
+  // A webhook belongs to the old Chain; the new one has none.
+  delete store.state.webhooks[person.name];
   store.save();
 }
 

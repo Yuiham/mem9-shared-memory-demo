@@ -43,6 +43,20 @@ export function createMem9(api) {
         timeoutMs: 600000,
       });
     },
+    // Webhook endpoints belong to a Chain and are managed with its key. The signing
+    // secret comes back only from creation (and rotation).
+    createWebhook(chain, { name, url, events }) {
+      return api.request('POST', chainPath(chain, '/webhooks'), { key: chain.key, body: { name, url, events } });
+    },
+    updateWebhook(chain, webhookId, changes) {
+      return api.request('PATCH', chainPath(chain, `/webhooks/${webhookId}`), { key: chain.key, body: changes });
+    },
+    async testWebhook(chain, webhookId) {
+      return (await api.request('POST', chainPath(chain, `/webhooks/${webhookId}/test`), { key: chain.key })).delivery;
+    },
+    async webhookDeliveries(chain, limit) {
+      return (await api.request('GET', chainPath(chain, '/webhook-deliveries'), { key: chain.key, query: { limit } })).deliveries ?? [];
+    },
     deleteMemories(key, ids) {
       return api.request('POST', `${ROOT}/mem9s/memories/batch-delete`, { key, body: { ids } });
     },

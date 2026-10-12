@@ -10,16 +10,18 @@ const PLACEHOLDER_EXAMPLE = 'https://receiver.invalid/';
 const OPTIONS = [
   { name: 'url', type: 'string', placeholder: 'public URL', description: 'The public HTTPS address the server should deliver to (set).' },
   { name: 'test', type: 'boolean', description: 'Also ask the server to send a test event to each endpoint (set).' },
+  { name: 'leader', type: 'string', placeholder: 'name', description: 'Only this Leader\'s Chain (deliveries; default: every Leader).' },
   ...COMMON_OPTIONS,
 ];
 
 const HELP = {
-  usage: 'set --url <public URL> [--test] [options]',
+  usage: '<set --url <public URL> [--test] | deliveries [--leader <name>]> [options]',
   summary: 'Registers one webhook endpoint per Leader Chain, so the Approval Example\'s announcements reach your receiver.',
   changes: [
     'On the server: creates one endpoint on each Leader Chain, subscribed only to routed-fact events, or updates the endpoint it already created (its signing secret stays). With --test it also asks the server to send a test event to each endpoint.',
     'Locally: records each endpoint and its signing secret in state/state.json. The secret is never printed.',
     'The server requires an HTTPS address without credentials and refuses a literal private IP address such as 127.0.0.1, so a receiver on this computer needs a tunnel that gives it a public HTTPS address. The server resolves a host name only when it delivers.',
+    'deliveries: lists the server\'s delivery records for each Leader Chain (or one with --leader), newest first, with status, attempts and the last error. Records carry no event content and do not say which node a delivery was for. Nothing changes.',
     `With no public address yet, register a placeholder such as ${PLACEHOLDER_EXAMPLE}: it is accepted and can never deliver, which is enough for \`verify\` and \`simulate\`. Do not combine it with --test.`,
   ],
   options: OPTIONS,
@@ -27,6 +29,7 @@ const HELP = {
     'sharedmem-admin webhook set --url https://abc123.tunnel.example.com/    # a real tunnel',
     `sharedmem-admin webhook set --url ${PLACEHOLDER_EXAMPLE}                   # placeholder, no delivery`,
     'sharedmem-admin webhook set --url https://abc123.tunnel.example.com/ --test',
+    'sharedmem-admin webhook deliveries --leader lucia    # did the server try, and what failed?',
   ],
   next: 'Start the receiver with `sharedmem-admin receiver serve`, then check the Approval Cases with `sharedmem-admin verify`.',
 };
@@ -111,7 +114,35 @@ async function set(values, { io, env, program }) {
   return 0;
 }
 
-const SUBCOMMANDS = { set };
+const DELIVERY_LIMIT = 20;
+
+async function deliveries(values, { io, env }) {
+  const ctx = openContext({ io, env, workdirFlag: values.workdir });
+  const { state } = ctx.store;
+  const leaders = (state?.participants ?? []).filter((person) => person.role === 'leader' && state.chains[person.name]);
+  if (leaders.length === 0) throw new CliError('There is no Leader Chain in the state.', { next: 'Run `sharedmem-admin init` first.' });
+  let chosen = leaders;
+  if (values.leader) {
+    chosen = leaders.filter((leader) => leader.name === values.leader);
+    if (chosen.length === 0) {
+      throw new CliError(`"${values.leader}" is not a Leader with a Chain.`, { next: `Use one of: ${leaders.map((leader) => leader.name).join(', ')}.` });
+    }
+  }
+  for (const leader of chosen) {
+    const records = await ctx.mem9.webhookDeliveries(state.chains[leader.name], DELIVERY_LIMIT);
+    io.out(`${leader.name}: ${records.length === 0 ? 'no delivery records' : `${records.length} delivery ${records.length === 1 ? 'record' : 'records'}, newest first`}`);
+    for (const record of records) {
+      const http = record.last_http_status ?? '-';
+      io.out(`  ${String(record.created_at ?? '').slice(0, 19).replace('T', ' ')}  ${record.event_type}  ${record.status}  attempts=${record.attempt_count}  http=${http}${record.last_error ? `  ${record.last_error}` : ''}`);
+    }
+  }
+  io.out('');
+  io.out('Records say nothing about the event content or which node a delivery was for; only the receiver sees the content.');
+  io.out('Next step: if deliveries fail, check the registered address with `sharedmem-admin webhook set --url <address> --test` and watch the receiver\'s terminal.');
+  return 0;
+}
+
+const SUBCOMMANDS = { set, deliveries };
 
 export async function run(argv, context) {
   const { program } = context;

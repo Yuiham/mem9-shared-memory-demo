@@ -40,6 +40,8 @@ A `state` or `candidates` file that is not valid JSON is reported with the same 
 
 ### The receiver does not receive anything
 
+Start with `webhook deliveries`: it shows whether the server tried and the last error of each attempt (`pending` with an error means it will retry). Then check:
+
 1. Is it running, in the same working directory? `state/receiver.json` exists while it runs.
 2. Is the tunnel forwarding to the port the receiver printed?
 3. Is the registered address the tunnel's public HTTPS address, and not the placeholder? Run `webhook set --url <address> --test` and watch the receiver's terminal for a test event.

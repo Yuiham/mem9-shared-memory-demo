@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { ANNOUNCEMENT, approvalDemo as approvalWithReceiver } from '../testing/approval.support.mjs';
 import { withHarness } from '../testing/harness.support.mjs';
 
 const PUBLIC_URL = 'https://receiver.example.com/hooks';
@@ -163,4 +164,37 @@ test('webhook --help covers what it changes and the next step', async (t) => {
   assert.match(result.stdout, /set --url/);
   assert.match(result.stdout, /HTTPS/);
   assert.match(result.stdout, /receiver\.invalid/);
+});
+
+// ---- deliveries ---------------------------------------------------------------------
+
+test('webhook deliveries lists the server\'s records newest first, with status, attempts and the last error', async (t) => {
+  const demo = await approvalWithReceiver(t, { receiver: false });
+  const { h } = demo;
+  assert.equal(await h.say('lucia', ANNOUNCEMENT), 200);
+  assert.equal(await h.say('lucia', 'Release freeze for checkout and payments begins Friday.'), 200);
+  h.fake.failNextDelivery();
+  await h.fake.flushDeliveries('http://127.0.0.1:9');
+  const result = await h.admin(['webhook', 'deliveries', '--leader', 'lucia']);
+  assert.equal(result.code, 0, result.output);
+  assert.match(result.stdout, /^lucia: 2 delivery records, newest first/m);
+  const lines = result.stdout.split('\n').filter((line) => line.startsWith('  '));
+  assert.equal(lines.length, 2);
+  assert.match(lines[0], /space_chain\.fact_routed\s+pending\s+attempts=1\s+http=-\s+delivery failed/, 'the newest record could not reach the address');
+  assert.match(lines[1], /space_chain\.fact_routed\s+pending\s+attempts=1\s+http=-\s+forced failure/, 'the older record was made to fail');
+  assert.ok(!result.stdout.includes(ANNOUNCEMENT), 'no event content');
+  assert.match(result.stdout, /which node/);
+});
+
+test('webhook deliveries covers every Leader by default and one with --leader', async (t) => {
+  const demo = await approvalWithReceiver(t, { receiver: false });
+  const everyone = await demo.h.admin(['webhook', 'deliveries']);
+  assert.equal(everyone.code, 0, everyone.output);
+  assert.match(everyone.stdout, /^lucia: no delivery records/m);
+  assert.match(everyone.stdout, /^marco: no delivery records/m);
+  const one = await demo.h.admin(['webhook', 'deliveries', '--leader', 'marco']);
+  assert.doesNotMatch(one.stdout, /^lucia:/m);
+  const unknown = await demo.h.admin(['webhook', 'deliveries', '--leader', 'ana']);
+  assert.equal(unknown.code, 1);
+  assert.match(unknown.stderr, /lucia, marco/);
 });

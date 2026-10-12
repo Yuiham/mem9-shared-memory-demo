@@ -83,6 +83,10 @@ Approval Example. Registers one webhook endpoint on every Leader Chain, subscrib
 - With no public address yet, register the placeholder `https://receiver.invalid/`: it is accepted and can never deliver. That is enough for `verify` and `simulate`. Do not combine it with `--test`.
 - `--test` asks the server to send a test event to each endpoint; watch the receiver's terminal for it.
 
+### `webhook deliveries [--leader <name>]`
+
+Lists the server's delivery records for every Leader Chain (or one with `--leader`), newest first, with status (`pending`, `delivered` or `failed`), attempts, the last HTTP status and the last error. Use it to see whether the server tried to deliver and what went wrong. Records carry no event content and do not say which node a delivery was for.
+
 ### `receiver serve [--port <number>]`
 
 Runs the local receiver in the foreground until Ctrl+C. It listens on `127.0.0.1` only (default port 8787; `--port 0` picks a free one), accepts deliveries on any path, and prints where it listens.

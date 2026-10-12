@@ -4,6 +4,10 @@ const ROOT = '/v1alpha2';
 
 export function createMem9(api) {
   const chainPath = (chain, rest = '') => `${ROOT}/space-chains/${chain.id}${rest}`;
+  async function listPage(key, query = {}) {
+    const body = await api.request('GET', `${ROOT}/mem9s/memories`, { key, query: { limit: 200, ...query } });
+    return { memories: body?.memories ?? [], total: body?.total ?? 0 };
+  }
   return {
     async provisionSpace() {
       return (await api.request('POST', '/v1alpha1/mem9s')).id;
@@ -30,8 +34,10 @@ export function createMem9(api) {
     writePinned(spaceKey, { text, agentId, tags }) {
       return api.request('POST', `${ROOT}/mem9s/memories`, { key: spaceKey, body: { content: text, memory_type: 'pinned', agent_id: agentId, tags } });
     },
+    // A page of Memories and the total the server counts for the same filter.
+    listPage,
     async listMemories(key, query = {}) {
-      return (await api.request('GET', `${ROOT}/mem9s/memories`, { key, query: { limit: 200, ...query } })).memories ?? [];
+      return (await listPage(key, query)).memories;
     },
   };
 }

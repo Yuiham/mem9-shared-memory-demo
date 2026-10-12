@@ -72,6 +72,17 @@ export async function createHarness({ fake = true, fakeOptions } = {}) {
     readState() {
       return JSON.parse(fs.readFileSync(path.join(workdir, 'state', 'state.json'), 'utf8'));
     },
+    // Plays a plugin: one user message written through a participant's Chain key, the
+    // way a coding agent would, so routing and extraction run on the fake server.
+    async say(person, content, { sync = true, agentId, tool = 'codex', sessionId = 'test-session' } = {}) {
+      const key = harness.readState().chains[person].key;
+      const response = await fetch(`${server.url}/v1alpha2/mem9s/memories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': key, 'X-Mnemo-Agent-Id': tool },
+        body: JSON.stringify({ agent_id: agentId ?? person, session_id: sessionId, sync, messages: [{ role: 'user', content }] }),
+      });
+      return response.status;
+    },
     standinLog() {
       return fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8').split('\n').filter(Boolean) : [];
     },

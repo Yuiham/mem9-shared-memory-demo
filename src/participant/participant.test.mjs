@@ -44,6 +44,17 @@ test('Claude Code: adds the marketplace, installs at project-local scope and wri
   assert.equal(fs.statSync(file).mode & 0o777, 0o600);
 });
 
+// Found by installing the real plugin: the install enables the plugin in the same file
+// the variables are written to, so the file must be read again after the install.
+test('Claude Code: the plugin stays enabled in the settings the install wrote', async (t) => {
+  const { project, run } = await setup(t);
+  const result = await run(['--agent', 'claude', '--dir', project, '--yes']);
+  assert.equal(result.code, 0, result.output);
+  const settings = JSON.parse(fs.readFileSync(path.join(project, '.claude', 'settings.local.json'), 'utf8'));
+  assert.deepEqual(settings.enabledPlugins, { 'mem9@mem9': true });
+  assert.equal(settings.env.MEM9_AGENT_ID, 'ana');
+});
+
 test('Claude Code: prints where to go, what to say and ask and what to expect, and never launches the agent', async (t) => {
   const { h, kit, project, run } = await setup(t);
   const result = await run(['--agent', 'claude', '--dir', project, '--yes']);
@@ -71,11 +82,12 @@ test('Claude Code: existing settings are kept and only the three variables are s
   const { project, run } = await setup(t);
   const file = path.join(project, '.claude', 'settings.local.json');
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify({ permissions: { allow: ['Bash(ls)'] }, env: { FOO: '1', MEM9_AGENT_ID: 'old' } }), { mode: 0o644 });
+  fs.writeFileSync(file, JSON.stringify({ permissions: { allow: ['Bash(ls)'] }, enabledPlugins: { 'other@market': true }, env: { FOO: '1', MEM9_AGENT_ID: 'old' } }), { mode: 0o644 });
   const result = await run(['--agent', 'claude', '--dir', project, '--yes']);
   assert.equal(result.code, 0, result.output);
   const merged = JSON.parse(fs.readFileSync(file, 'utf8'));
   assert.deepEqual(merged.permissions, { allow: ['Bash(ls)'] });
+  assert.deepEqual(merged.enabledPlugins, { 'other@market': true, 'mem9@mem9': true });
   assert.equal(merged.env.FOO, '1');
   assert.equal(merged.env.MEM9_AGENT_ID, 'ana');
   assert.equal(merged.env.MEM9_WRITER_ID, undefined, 'the writing-tool name is left at its default');

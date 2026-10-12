@@ -53,12 +53,14 @@ export function preflight({ env, dir }) {
 }
 
 export async function configure({ io, env, person, dir }) {
-  const settings = readSettings(dir);
   const run = (args) => mustRun({ display: `claude ${args.join(' ')}`, command: 'claude', args, cwd: dir, env });
   io.out('Adding the mem9 marketplace to Claude Code...');
   await run(['plugin', 'marketplace', 'add', 'mem9-ai/mem9']);
   io.out('Installing the mem9 plugin (project-local scope)...');
   await run(['plugin', 'install', 'mem9@mem9', '--scope', 'local']);
+  // Read only now: the local-scope install enables the plugin in this same file
+  // (`enabledPlugins`), and writing back settings read earlier would leave it disabled.
+  const settings = readSettings(dir);
   settings.env = {
     ...(settings.env && typeof settings.env === 'object' ? settings.env : {}),
     MEM9_API_URL: person.serverUrl,

@@ -16,6 +16,10 @@ The state records the server it was created for, and every command refuses to ru
 
 A Chain or Space key in the state is not known to the server. The usual causes are a state file from another server, or a Chain deleted on the server. For a deleted Chain, running `init` creates it again on the same Spaces; its key changes, so run `export` again and hand out the new Kits.
 
+### `Cannot reach the mem9 server`
+
+Check the address and your network first. A connection that is cut in the middle (`UND_ERR_SOCKET`, `ECONNRESET`) can also happen on a busy or distant server. Reads and deletions are retried twice on their own; a write is never repeated, because the server may have processed it, so the command stops and you run it again. `verify` removes the test Memories of every Case it started, including the one that was being written when the connection was cut. A server that is slow (a few seconds per call is normal on the development server; `verify` takes about five minutes for twelve Cases) is not an error.
+
 ### I lost the state file
 
 The server cannot list or delete Spaces, so the state file is the only record of their keys.

@@ -118,13 +118,16 @@ async function checkApprovalPath({ ctx, speaker, agentId, seen, waitMs }) {
   return { ok: true, note: 'delivery recorded and the Candidate arrived at the receiver (marked as a test Candidate).' };
 }
 
-async function runCase({ ctx, testCase, example, run, waitMs }) {
+async function runCase({ ctx, testCase, example, run, waitMs, written }) {
   const { store, mem9 } = ctx;
   const speaker = pickSpeaker(store.state, testCase.role);
   const agentId = `verify-${run}-${testCase.id}`;
   const expected = expectedSpaces(testCase, example);
   const result = { id: testCase.id, speaker: speaker.name, expected, actual: [], status: 'fail', note: '', agentId, speakerEntry: speaker };
   const wantsCandidate = expectsCandidate(testCase, example);
+  // Registered before anything is written, so the sweep also covers a Case that stops
+  // halfway (a write whose answer was lost may still have created Memories).
+  written.push(result);
   try {
     const seen = wantsCandidate ? await deliveryIds(mem9, store.state.chains[speaker.name]) : null;
     await mem9.writeMessages(store.state.chains[speaker.name].key, {
@@ -187,9 +190,7 @@ export async function run(argv, { io, env, program }) {
         results.push({ id: testCase.id, speaker: pickSpeaker(state, testCase.role).name, expected: expectedSpaces(testCase, example), actual: [], status: 'skip', note: 'needs a webhook' });
         continue;
       }
-      const result = await runCase({ ctx, testCase, example, run: runId, waitMs: waitSeconds * 1000 });
-      written.push(result);
-      results.push(result);
+      results.push(await runCase({ ctx, testCase, example, run: runId, waitMs: waitSeconds * 1000, written }));
     }
   } finally {
     // Tidy up even when the run stops early; the sweep only reads and deletes what this run wrote.

@@ -46,6 +46,7 @@ export class FakeMem9 {
     this.receiverUrl = null;
     this.forceDeliveryFailure = false;
     this.injected = null;
+    this.faults = [];
     this.creatingCalls = 0;
     this.sequence = 0;
     this.timers = new Set();
@@ -97,6 +98,14 @@ export class FakeMem9 {
 
   clearFailure() {
     this.injected = null;
+  }
+
+  // Cuts the connection of the next `count` requests that match a method and a path
+  // pattern, without an answer, like a load balancer or a flaky network does.
+  // `when: 'before'` cuts before the request is processed; `when: 'after'` processes it
+  // and loses the answer (the caller cannot tell whether it took effect).
+  dropConnections({ method, path, count = 1, when = 'before' }) {
+    this.faults.push({ method, path, count, when });
   }
 
   failNextDelivery() {
@@ -152,8 +161,12 @@ export class FakeMem9 {
     const key = request.headers['x-api-key'];
     const header = request.headers['x-mnemo-agent-id'] ?? '';
     this.requests.push({ method: request.method, path: url.pathname, query: Object.fromEntries(url.searchParams), body, key, header });
+    const fault = this.faults.find((entry) => entry.count > 0 && entry.method === request.method && (entry.path instanceof RegExp ? entry.path.test(url.pathname) : entry.path === url.pathname));
+    if (fault) fault.count -= 1;
+    if (fault?.when === 'before') return request.socket.destroy();
     try {
       const result = await this.#route(request.method, url, body, key, header);
+      if (fault) return request.socket.destroy();
       this.#send(response, result.status, result.body);
     } catch (error) {
       if (error instanceof HttpError) this.#send(response, error.status, { error: error.message });

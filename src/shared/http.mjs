@@ -28,8 +28,16 @@ export function toCliError(error) {
   });
 }
 
+// A connection that the network or a load balancer cut (rather than a server that is
+// down or slow) is worth a short retry, but only for a request that is safe to repeat.
+const CUT_CONNECTION = new Set(['UND_ERR_SOCKET', 'ECONNRESET', 'EPIPE']);
+const RETRIES = 2;
+const RETRY_DELAY_MS = 300;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export function createApiClient(baseUrl, { toolName = 'sharedmem' } = {}) {
-  async function request(method, path, { key, body, query, timeoutMs = 30000 } = {}) {
+  // `retry` marks a request that can be repeated without a second effect; reads always can.
+  async function request(method, path, { key, body, query, timeoutMs = 30000, retry = method === 'GET' } = {}) {
     const url = new URL(baseUrl + path);
     for (const [name, value] of Object.entries(query ?? {})) {
       if (value !== undefined && value !== null && value !== '') url.searchParams.set(name, String(value));
@@ -40,18 +48,25 @@ export function createApiClient(baseUrl, { toolName = 'sharedmem' } = {}) {
     if (key) headers['X-API-Key'] = key;
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     let response;
-    try {
-      response = await fetch(url, {
-        method,
-        headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-    } catch (error) {
-      const reason = error?.name === 'TimeoutError' ? 'it did not answer in time' : (error?.cause?.code ?? 'connection failed');
-      throw new CliError(`Cannot reach the mem9 server (${reason}).`, {
-        next: 'Check SHAREDMEM_API_URL and your network connection, then run the command again.',
-      });
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        response = await fetch(url, {
+          method,
+          headers,
+          body: body === undefined ? undefined : JSON.stringify(body),
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+        break;
+      } catch (error) {
+        if (retry && attempt < RETRIES && CUT_CONNECTION.has(error?.cause?.code)) {
+          await sleep(RETRY_DELAY_MS);
+          continue;
+        }
+        const reason = error?.name === 'TimeoutError' ? 'it did not answer in time' : (error?.cause?.code ?? 'connection failed');
+        throw new CliError(`Cannot reach the mem9 server (${reason}).`, {
+          next: 'Check SHAREDMEM_API_URL and your network connection, then run the command again.',
+        });
+      }
     }
     const text = await response.text();
     let json = null;

@@ -58,7 +58,8 @@ export function createMem9(api) {
       return (await api.request('GET', chainPath(chain, '/webhook-deliveries'), { key: chain.key, query: { limit } })).deliveries ?? [];
     },
     deleteMemories(key, ids) {
-      return api.request('POST', `${ROOT}/mem9s/memories/batch-delete`, { key, body: { ids } });
+      // Deleting the same ids again changes nothing, so a cut connection may be retried.
+      return api.request('POST', `${ROOT}/mem9s/memories/batch-delete`, { key, body: { ids }, retry: true });
     },
     // A page of Memories and the total the server counts for the same filter.
     listPage,

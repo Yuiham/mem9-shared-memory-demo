@@ -266,3 +266,27 @@ test('--wait must be a number of seconds', async (t) => {
   assert.match(help.stdout, /--wait <seconds>/);
   assert.match(help.stdout, /Candidate/);
 });
+
+// Found on the real dev server: a connection that the network cut once made a whole run
+// stop, and the Case being written was not tidied up.
+const verifyMemories = (h) => h.fake.spaceIds().flatMap((id) => h.fake.memoriesIn(id)).filter((memory) => memory.agent_id.startsWith('verify-'));
+
+test('a connection cut once while reading or deleting is retried, so the run still passes and leaves nothing behind', async (t) => {
+  const h = await demo(t);
+  h.fake.dropConnections({ method: 'GET', path: MEMORIES, count: 1 });
+  h.fake.dropConnections({ method: 'POST', path: `${MEMORIES}/batch-delete`, count: 1 });
+  const result = await h.admin(['verify']);
+  assert.equal(result.code, 0, result.output);
+  assert.match(result.stdout, /12 Cases: 12 passed/);
+  assert.deepEqual(verifyMemories(h), []);
+});
+
+test('a write whose answer is lost stops the run, and the Case that was being written is tidied up too', async (t) => {
+  const h = await demo(t);
+  h.fake.dropConnections({ method: 'POST', path: MEMORIES, count: 1, when: 'after' });
+  const result = await h.admin(['verify']);
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /Cannot reach the mem9 server/);
+  assert.equal(writes(h).length, 1, 'a write is never repeated: the server may have processed it');
+  assert.deepEqual(verifyMemories(h), [], 'the Memories the lost write created are removed');
+});

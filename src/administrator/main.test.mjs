@@ -4,7 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { withHarness } from '../testing/harness.support.mjs';
 
-const COMMAND_NAMES = ['init', 'memories', 'verify', 'teardown'];
+const COMMAND_NAMES = ['init', 'memories', 'verify', 'export', 'teardown'];
 
 test('running with no arguments prints the overview and succeeds', async (t) => {
   const h = await withHarness(t, { fake: false });

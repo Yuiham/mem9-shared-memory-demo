@@ -11,9 +11,9 @@ const INSTALL_CLAUDE = 'claude plugin install mem9@mem9 --scope local';
 const MARKETPLACE_CODEX = 'codex plugin marketplace add mem9-ai/mem9';
 const ADD_CODEX = 'codex plugin add mem9@mem9-ai';
 
-async function setup(t, personOverrides) {
+async function setup(t, kitOptions) {
   const h = await withHarness(t);
-  const kit = createKit(h, personOverrides);
+  const kit = await createKit(h, kitOptions);
   const project = path.join(h.root, 'project');
   fs.mkdirSync(project);
   return { h, kit, project, run: (args, options) => h.participant(kit.dir, args, options) };
@@ -315,7 +315,7 @@ test('--help says what the program changes and shows examples', async (t) => {
 });
 
 test('a Leader in the Approval Example is told which announcements wait for approval', async (t) => {
-  const { project, run } = await setup(t, { name: 'lucia', role: 'leader', agentId: 'lucia', example: 'approval' });
+  const { project, run } = await setup(t, { participant: 'lucia', example: 'approval' });
   const result = await run(['--agent', 'claude', '--dir', project, '--yes']);
   assert.equal(result.code, 0, result.output);
   assert.match(result.stdout, /Approval/);

@@ -7,7 +7,7 @@ import { FakeMem9 } from './fake-mem9.support.mjs';
 import { installStandins, searchPathFor } from './standins.support.mjs';
 import { killAllChildren, makeEnv, makeTempRoot, preflight, runCli, startProgram } from './run-cli.support.mjs';
 
-const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+export const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 export const ADMIN_LAUNCHER = path.join(REPO_ROOT, 'bin', 'sharedmem-admin');
 export const PARTICIPANT_LAUNCHER_NAME = path.join('bin', 'sharedmem-participant');
 

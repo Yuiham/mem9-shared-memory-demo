@@ -96,8 +96,10 @@ export function findSystemTool(name) {
 export function makeEnv({ root, serverUrl, workdir, searchPath, extra = {} }) {
   const home = path.join(root, 'home');
   const temporary = path.join(root, 'tmp');
+  const gitTemplate = path.join(root, 'git-template');
   fs.mkdirSync(home, { recursive: true });
   fs.mkdirSync(temporary, { recursive: true });
+  fs.mkdirSync(gitTemplate, { recursive: true });
   const env = {
     HOME: home,
     TMPDIR: temporary,
@@ -115,6 +117,9 @@ export function makeEnv({ root, serverUrl, workdir, searchPath, extra = {} }) {
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_TERMINAL_PROMPT: '0',
+    // An empty template keeps `git init` from copying anything from the machine's own
+    // Git templates into a test repository.
+    GIT_TEMPLATE_DIR: gitTemplate,
     ...extra,
   };
   if (serverUrl) env.SHAREDMEM_API_URL = serverUrl;

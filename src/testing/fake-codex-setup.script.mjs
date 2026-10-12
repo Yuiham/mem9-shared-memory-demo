@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const args = process.argv.slice(2);
 const supportsAgentId = process.env.STANDIN_SETUP_AGENT_ID === '1';
@@ -39,6 +40,9 @@ function parse(tokens) {
 
 const [group, command, ...rest] = args;
 log(`setup ${group ?? ''} ${command ?? ''} ${rest.join(' ')}`.replace(/\s+/g, ' ').trim());
+// Which plugin cache version this copy of the script sits in: <version>/skills/setup/scripts.
+log(`setup script-version=${path.basename(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..'))}`);
+if (process.env.STANDIN_SETUP_FAIL && !rest.includes('--help')) fail('simulated setup failure');
 
 if (group === 'scope' && command === 'apply' && rest.includes('--help')) {
   console.log([

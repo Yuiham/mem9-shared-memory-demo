@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { ANNOUNCEMENT, approvalDemo } from '../testing/approval.support.mjs';
 import { SHIPPED_ROUTING, withHarness } from '../testing/harness.support.mjs';
 
 const MEMORIES = '/v1alpha2/mem9s/memories';
@@ -159,4 +160,109 @@ test('verify never prints a key or the server address, and its help says what it
   assert.match(help.stdout, /What it changes:/);
   assert.match(help.stdout, /removes/i);
   assert.match(help.stdout, /--cases/);
+});
+
+// ---- Approval Example ---------------------------------------------------------------
+
+const WITHOUT_ANNOUNCEMENTS = { rules: SHIPPED_ROUTING.rules.filter((rule) => !/two reviewers/.test(String(rule.match))) };
+const REAL_LOOKING = 'https://receiver.example.com/hooks';
+
+test('Approval, no receiver: the held-back Cases pass on a recorded delivery and nothing in Team Shared', async (t) => {
+  const { h } = await approvalDemo(t, { receiver: false });
+  const result = await h.admin(['verify']);
+  assert.equal(result.code, 0, result.output);
+  assert.match(result.stdout, /Approval Example/);
+  for (const id of ['W1', 'W2']) {
+    assert.match(resultLine(result.stdout, id), /Personal\s+Personal\s+PASS/, id);
+    assert.match(result.stdout, new RegExp(`${id}: delivery recorded; start the receiver`));
+  }
+  assert.match(result.stdout, /12 Cases: 12 passed, 0 failed, 0 skipped/);
+  const deliveries = h.fake.deliveries.filter((delivery) => delivery.record.event_type === 'space_chain.fact_routed' && delivery.envelope.data.webhook_only);
+  assert.equal(deliveries.length, 2, 'one held-back delivery per W Case');
+  const team = h.readState().spaces['team-shared'].key;
+  assert.deepEqual(h.fake.memoriesIn(team).filter((memory) => memory.agent_id.startsWith('verify-')), []);
+});
+
+test('Approval, receiver running: the matching Candidate must arrive, and it is a test Candidate', async (t) => {
+  const demo = await approvalDemo(t, { webhook: REAL_LOOKING });
+  const result = await demo.h.admin(['verify']);
+  assert.equal(result.code, 0, result.output);
+  assert.match(result.stdout, /W1: delivery recorded and the Candidate arrived/);
+  const candidates = demo.candidates().candidates;
+  assert.equal(candidates.length, 2);
+  assert.ok(candidates.every((candidate) => candidate.test && candidate.agentId.startsWith('verify-') && candidate.status === 'pending'));
+  assert.deepEqual(candidates.map((candidate) => candidate.text).sort(), ['Release freeze for checkout and payments begins Friday at 18:00 UTC and ends Monday morning.', 'Starting Monday, all production deploys require two reviewers.'].sort());
+  const listing = await demo.h.admin(['candidates']);
+  assert.match(listing.stdout, /No Candidates yet/, 'test Candidates are hidden from the default listing');
+  assert.match((await demo.h.admin(['candidates', '--include-test'])).stdout, /c1\s+pending\s+lucia\s+test/);
+});
+
+test('Approval, receiver running but the Candidate never arrives: a failure that says what to check', async (t) => {
+  const demo = await approvalDemo(t, { webhook: REAL_LOOKING });
+  demo.h.fake.setReceiver(null);
+  const result = await demo.h.admin(['verify', '--wait', '1']);
+  assert.equal(result.code, 1);
+  assert.match(resultLine(result.stdout, 'W1'), /Personal\s+Personal\s+FAIL/);
+  assert.match(result.stdout, /W1: the server recorded a delivery, but no Candidate reached the receiver within 1 seconds/);
+  assert.match(resultLine(result.stdout, 'T1'), /PASS/);
+});
+
+test('Approval, receiver running with a placeholder address: the Candidate check is skipped with a notice', async (t) => {
+  const demo = await approvalDemo(t);
+  demo.h.fake.setReceiver(null); // the real server can never reach a placeholder address
+  const result = await demo.h.admin(['verify']);
+  assert.equal(result.code, 0, result.output);
+  assert.match(result.stdout, /W1: delivery recorded; the Candidate check was skipped because the webhook address is a placeholder/);
+  assert.equal(demo.candidates().candidates.length, 0);
+});
+
+test('Approval, no delivery recorded: the held-back Cases fail', async (t) => {
+  const { h } = await approvalDemo(t, { receiver: false });
+  h.fake.setRouting(WITHOUT_ANNOUNCEMENTS);
+  const result = await h.admin(['verify', '--wait', '1']);
+  assert.equal(result.code, 1);
+  assert.match(resultLine(result.stdout, 'W1'), /FAIL/);
+  assert.match(result.stdout, /W1: the server recorded no routed-fact delivery for this Chain within 1 seconds/);
+  assert.match(result.stdout, /10 passed, 2 failed, 0 skipped/);
+});
+
+test('Approval: a delivery from before the write does not count', async (t) => {
+  const { h } = await approvalDemo(t, { receiver: false });
+  assert.equal(await h.say('lucia', ANNOUNCEMENT), 200, 'an earlier announcement leaves a delivery record behind');
+  h.fake.setRouting(WITHOUT_ANNOUNCEMENTS);
+  const result = await h.admin(['verify', '--wait', '0']);
+  assert.equal(result.code, 1);
+  assert.match(resultLine(result.stdout, 'W1'), /FAIL/);
+});
+
+test('Approval: a copy that reaches Team Shared because the node is not webhook-only is a failure', async (t) => {
+  const { h } = await approvalDemo(t, { receiver: false });
+  h.fake.chainByName('sharedmem-demo-lucia').nodes[2].routing_policy_webhook_only = false;
+  const result = await h.admin(['verify', '--wait', '0']);
+  assert.equal(result.code, 1);
+  assert.match(resultLine(result.stdout, 'W1'), /Personal\s+Personal, Team Shared\s+FAIL/);
+});
+
+test('Approval: the Cases are skipped when the Leader they use has no webhook, even if another Leader has one', async (t) => {
+  const { h } = await approvalDemo(t, { receiver: false });
+  const file = path.join(h.workdir, 'state', 'state.json');
+  const state = h.readState();
+  delete state.webhooks.lucia;
+  fs.writeFileSync(file, JSON.stringify(state));
+  const result = await h.admin(['verify']);
+  assert.equal(result.code, 0, result.output);
+  assert.match(resultLine(result.stdout, 'W1'), /SKIP/);
+  assert.match(result.stdout, /no webhook is registered for the Leader/);
+});
+
+test('--wait must be a number of seconds', async (t) => {
+  const h = await demo(t);
+  for (const bad of ['soon', '-1', '']) {
+    const result = await h.admin(['verify', '--wait', bad]);
+    assert.equal(result.code, 2, JSON.stringify(bad));
+    assert.match(result.stderr, /--wait/);
+  }
+  const help = await h.admin(['verify', '--help']);
+  assert.match(help.stdout, /--wait <seconds>/);
+  assert.match(help.stdout, /Candidate/);
 });

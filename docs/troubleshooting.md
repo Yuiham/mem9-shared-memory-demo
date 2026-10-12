@@ -34,7 +34,8 @@ A `state` or `candidates` file that is not valid JSON is reported with the same 
 
 - **A Case reached too few spaces**: the Routing prompt did not match. Edit the prompt under `config/routing-prompts/`, run `init` to apply it, and verify again.
 - **A Case reached too many spaces**: the prompt is too broad.
-- **Routing varies between runs**: the model is not deterministic. Run the failing Case again; one flip is noise, a pattern is a prompt problem.
+- **Routing varies between runs**: the model is not deterministic. Run the failing Case again; one flip is noise, a pattern is a prompt problem. A Leadership Case that missed Leadership Shared in one run passed in the next.
+- **An Approval Case fails right after `init` or `webhook set`**: the server may take a few minutes to apply the change. Wait, then run `verify` again before editing a prompt.
 - **The table shows a server error**: the line below the table names the status and the call.
 - **A Case that should be personal never produced a Memory**: the server drops one-off remarks. Use a durable personal statement.
 

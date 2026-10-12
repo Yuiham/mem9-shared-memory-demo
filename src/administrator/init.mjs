@@ -121,7 +121,7 @@ async function configureChain({ ctx, person, example, prompts }) {
     await mem9.setRoutingPolicy(chain, nodes[index].id, wanted.policy);
     changed += 1;
   }
-  io.out(`  ${person.name}: ${sameNodes ? 'nodes unchanged' : 'nodes set'}, ${plural(changed, 'routing policy')} updated`);
+  io.out(`  ${person.name}: ${sameNodes ? 'nodes unchanged' : 'nodes set'}, ${changed} routing ${changed === 1 ? 'policy' : 'policies'} updated`);
 }
 
 async function writeSeeds({ ctx, seeds }) {

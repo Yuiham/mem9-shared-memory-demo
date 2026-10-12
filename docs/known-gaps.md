@@ -25,11 +25,12 @@ What the demo does not do, or cannot guarantee. Read this before showing it to a
 
 ## Plugins
 
-13. **Until the separate Codex plugin change that adds a configurable Agent ID is merged and installed, every Codex user writes under the same Agent ID (`codex`)**, and near-duplicate facts from different people can merge or overwrite each other. The Participant program applies the setting when the installed plugin supports it and otherwise skips that step with a notice. This gap stays listed until the change is merged.
+13. **A Codex plugin that predates the configurable Agent ID makes every Codex user write under the same Agent ID (`codex`)**, and near-duplicate facts from different people can merge or overwrite each other. Codex plugin 0.2.7 supports the setting (checked on a real install). The Participant program applies it when the installed plugin supports it and otherwise skips that step with a notice.
 14. **The Claude Code plugin provisions a new, empty Space by itself when it starts without a key**, so it must be started from the configured project directory.
 15. **Installing the Codex plugin changes the person's user-level Codex hook files** and stores the Chain's key in a user-level credentials file (`$MEM9_HOME/.credentials.json`, default `~/.mem9/`). The plugin creates that file readable by other users of the computer, so the Participant program restricts it to its owner. Only the project override is project-local.
 
 ## Server and local state
 
 16. **The server cannot list or delete Spaces.** The local state is the only record, and Spaces remain after `teardown`. Losing the state means the next `init` creates new Spaces and Chains, and the old ones stay on the server unused.
-17. **The demo does not change the server or the plugins**, and it does not support Windows, graphical interfaces or languages other than English in its documentation.
+17. **A change may take a few minutes to show on the server.** In one run, right after switching to the Approval Example and registering a webhook, `verify` found no routed-fact delivery for the two announcement Cases for about three minutes; about six minutes after the switch both passed. The cause was not established. If `verify` fails right after `init` or `webhook set`, wait a few minutes and run it again before changing a prompt.
+18. **The demo does not change the server or the plugins**, and it does not support Windows, graphical interfaces or languages other than English in its documentation.

@@ -99,6 +99,8 @@ test('re-running init changes nothing and keeps every key', async (t) => {
   assert.equal(h.count('PUT', /routing-policy$/), policyPuts, 'no policy was rewritten again');
   assert.deepEqual(h.readState(), before);
   assert.ok(h.fake.requests.length > calls, 'the run did check the server');
+  assert.match(second.stdout, /: nodes unchanged, 0 routing policies updated/);
+  assert.ok(!second.stdout.includes('policys'), 'the plural is spelled correctly');
 });
 
 test('switching Examples changes only the Leaders\' Team Shared node and keeps every chain key', async (t) => {

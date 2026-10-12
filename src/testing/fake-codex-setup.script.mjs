@@ -65,8 +65,12 @@ if (group === 'profile' && command === 'save-key') {
   const file = path.join(mem9Home, '.credentials.json');
   const existing = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : { profiles: {} };
   existing.profiles[options.profile] = { baseUrl: options['base-url'] ?? '', apiKey: process.env[options['api-key-env']] };
-  fs.writeFileSync(file, JSON.stringify(existing, null, 2), { mode: 0o600 });
-  console.log(JSON.stringify({ status: 'ok', command: 'profile save-key', profileId: options.profile, action: 'saved', baseUrl: options['base-url'] ?? '', credentialsPath: file, apiKeyEnv: options['api-key-env'], backups: [] }));
+  // Like the real script (observed in the isolated Linux machine): the file is created
+  // with the default mode, so it is readable by other users of the computer, and the
+  // reported path is the literal text "$MEM9_HOME/.credentials.json".
+  fs.writeFileSync(file, JSON.stringify(existing, null, 2));
+  fs.chmodSync(file, 0o644);
+  console.log(JSON.stringify({ status: 'ok', command: 'profile.save-key', profileId: options.profile, action: 'created', baseUrl: options['base-url'] ?? '', credentialsPath: '$MEM9_HOME/.credentials.json', apiKeyEnv: options['api-key-env'], backups: [] }));
   process.exit(0);
 }
 

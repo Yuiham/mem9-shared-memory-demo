@@ -27,7 +27,7 @@ What the demo does not do, or cannot guarantee. Read this before showing it to a
 
 13. **Until the separate Codex plugin change that adds a configurable Agent ID is merged and installed, every Codex user writes under the same Agent ID (`codex`)**, and near-duplicate facts from different people can merge or overwrite each other. The Participant program applies the setting when the installed plugin supports it and otherwise skips that step with a notice. This gap stays listed until the change is merged.
 14. **The Claude Code plugin provisions a new, empty Space by itself when it starts without a key**, so it must be started from the configured project directory.
-15. **Installing the Codex plugin changes the person's user-level Codex hook files** and stores the Chain's key in a user-level credentials file. Only the project override is project-local.
+15. **Installing the Codex plugin changes the person's user-level Codex hook files** and stores the Chain's key in a user-level credentials file (`$MEM9_HOME/.credentials.json`, default `~/.mem9/`). The plugin creates that file readable by other users of the computer, so the Participant program restricts it to its owner. Only the project override is project-local.
 
 ## Server and local state
 

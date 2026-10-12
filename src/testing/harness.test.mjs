@@ -59,7 +59,7 @@ test('the fake setup script saves a key from a variable, writes a project config
   assert.equal(saved.status, 0, saved.stderr);
   assert.equal(JSON.parse(saved.stdout).status, 'ok');
   assert.equal(JSON.parse(fs.readFileSync(path.join(env.MEM9_HOME, '.credentials.json'), 'utf8')).profiles.ana.apiKey, 'sk-fictional-key');
-  assert.equal(fs.statSync(path.join(env.MEM9_HOME, '.credentials.json')).mode & 0o777, 0o600);
+  assert.equal(fs.statSync(path.join(env.MEM9_HOME, '.credentials.json')).mode & 0o777, 0o644, 'like the real script, which does not restrict the file');
 
   const applied = setup('scope', 'apply', '--scope', 'project', '--profile', 'ana', '--agent-id', 'ana');
   assert.equal(applied.status, 0, applied.stderr);

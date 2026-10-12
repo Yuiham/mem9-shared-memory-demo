@@ -166,6 +166,17 @@ test('Codex: installs the plugin, saves the profile through the setup script and
   assert.ok(commandsOf(h, 'codex').every((line) => line.startsWith('codex plugin ')), 'Codex itself is never started');
 });
 
+// Found by installing the real plugin: its setup script creates the credentials file with
+// the default mode, so the Chain key would be readable by other users of the computer.
+test('Codex: the credentials file that holds the key is made owner-only', async (t) => {
+  const { h, project, run } = await setup(t);
+  gitInit(h, project);
+  const env = h.env({ extra: { STANDIN_SETUP_AGENT_ID: '1' } });
+  const result = await run(['--agent', 'codex', '--dir', project, '--yes'], { env });
+  assert.equal(result.code, 0, result.output);
+  assert.equal(fs.statSync(path.join(env.MEM9_HOME, '.credentials.json')).mode & 0o777, 0o600);
+});
+
 test('Codex: without Agent ID support in the setup command, that step is skipped with a notice and setup completes', async (t) => {
   const { h, project, run } = await setup(t);
   gitInit(h, project);

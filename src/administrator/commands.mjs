@@ -3,9 +3,11 @@
 import * as init from './init.mjs';
 import * as memories from './memories.mjs';
 import * as teardown from './teardown.mjs';
+import * as verify from './verify.mjs';
 
 export const COMMANDS = {
   init,
   memories,
+  verify,
   teardown,
 };

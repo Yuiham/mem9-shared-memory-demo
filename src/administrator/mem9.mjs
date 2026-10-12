@@ -34,6 +34,18 @@ export function createMem9(api) {
     writePinned(spaceKey, { text, agentId, tags }) {
       return api.request('POST', `${ROOT}/mem9s/memories`, { key: spaceKey, body: { content: text, memory_type: 'pinned', agent_id: agentId, tags } });
     },
+    // One user message per call, written through a Chain key the way a plugin would.
+    // The synchronous option returns after extraction and routing have finished.
+    writeMessages(chainKey, { messages, agentId, sessionId }) {
+      return api.request('POST', `${ROOT}/mem9s/memories`, {
+        key: chainKey,
+        body: { messages, agent_id: agentId, session_id: sessionId, sync: true },
+        timeoutMs: 600000,
+      });
+    },
+    deleteMemories(key, ids) {
+      return api.request('POST', `${ROOT}/mem9s/memories/batch-delete`, { key, body: { ids } });
+    },
     // A page of Memories and the total the server counts for the same filter.
     listPage,
     async listMemories(key, query = {}) {

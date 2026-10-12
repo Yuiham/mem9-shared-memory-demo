@@ -1,5 +1,6 @@
 // Entry point of the Administrator program: picks the command and reports errors.
 import { createIo, reportError, UsageError } from '../shared/cli.mjs';
+import { ApiError, toCliError } from '../shared/http.mjs';
 import { COMMANDS } from './commands.mjs';
 
 const PROGRAM = 'sharedmem-admin';
@@ -33,6 +34,6 @@ export async function main(argv, { stdout, stderr, stdin, env = process.env } = 
     }
     return await command.run(rest, { io, env, program: `${PROGRAM} ${name}` });
   } catch (error) {
-    return reportError(io, error);
+    return reportError(io, error instanceof ApiError ? toCliError(error) : error);
   }
 }

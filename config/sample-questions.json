@@ -1,0 +1,13 @@
+{
+  "about": "Each participant is handed one question, picked by position within their role (counting from zero, in cast order, wrapping around). 'finds' names the seed memory the answer should contain; 'nothing' means the answer should find nothing, which shows that a space is out of reach.",
+  "developer": [
+    { "question": "What is our rule for merging pull requests?", "finds": { "seed": "team-1" } },
+    { "question": "When does the on-call handoff happen, and where do the notes go?", "finds": { "seed": "team-2" } },
+    { "question": "How are feature flags for checkout changes named?", "finds": { "seed": "team-3" } },
+    { "question": "When is the annual planning offsite?", "finds": { "nothing": "Leadership Shared is not in a Developer's Chain, so this question should find nothing." } }
+  ],
+  "leader": [
+    { "question": "When does the leadership sync happen?", "finds": { "seed": "leadership-1" } },
+    { "question": "What is our rule for merging pull requests?", "finds": { "seed": "team-1" } }
+  ]
+}

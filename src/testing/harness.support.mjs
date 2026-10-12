@@ -40,8 +40,22 @@ export async function createHarness({ fake = true, fakeOptions } = {}) {
       preflight(merged, { root, standinDir: standins.standinDir, scenario });
       return merged;
     },
-    async admin(args, { env, input, timeoutMs } = {}) {
-      return runCli({ launcher: ADMIN_LAUNCHER, args, env: env ?? harness.env(), cwd: workdir, input, timeoutMs });
+    async admin(args, { env, input, timeoutMs, launcher } = {}) {
+      return runCli({ launcher: launcher ?? ADMIN_LAUNCHER, args, env: env ?? harness.env(), cwd: workdir, input, timeoutMs });
+    },
+    // Copies the programs and their shipped content into the temporary directory, so a
+    // test can change shipped content without touching the repository. Returns the
+    // copy's Administrator launcher.
+    copyProgram() {
+      const target = path.join(root, 'program-copy');
+      for (const name of ['bin', 'src', 'config']) fs.cpSync(path.join(REPO_ROOT, name), path.join(target, name), { recursive: true });
+      return { dir: target, launcher: path.join(target, 'bin', 'sharedmem-admin') };
+    },
+    // Counts the requests the fake server received for a method and an exact path
+    // (a string) or a pattern.
+    count(method, where) {
+      const matches = (requestPath) => (where instanceof RegExp ? where.test(requestPath) : requestPath === where);
+      return server.requests.filter((request) => request.method === method && matches(request.path)).length;
     },
     // Runs a program from an exported Kit, never from the source tree.
     async participant(kitDir, args, { env, input, cwd, timeoutMs } = {}) {

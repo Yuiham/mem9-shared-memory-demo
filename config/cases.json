@@ -1,0 +1,77 @@
+{
+  "about": "Each case is one sentence a person says. 'role' is who says it (leader or developer). 'reaches' lists, for each example, where a memory from the sentence should end up: 'personal' is the speaker's own Personal space, 'team-shared' and 'leadership-shared' are the Shared spaces, and 'candidate' means the Approval example should propose it to Team Shared for approval. Any space not listed should receive nothing.",
+  "cases": [
+    {
+      "id": "T1",
+      "role": "developer",
+      "sentence": "We always run database migrations before deploying the API.",
+      "reaches": { "basic": ["personal", "team-shared"], "approval": ["personal", "team-shared"] }
+    },
+    {
+      "id": "T2",
+      "role": "developer",
+      "sentence": "Payment webhook handlers must be idempotent so the same event ID never charges twice.",
+      "reaches": { "basic": ["personal", "team-shared"], "approval": ["personal", "team-shared"] }
+    },
+    {
+      "id": "T3",
+      "role": "developer",
+      "sentence": "After the June 12 checkout outage, we learned never to deploy during peak traffic without a documented rollback plan.",
+      "reaches": { "basic": ["personal", "team-shared"], "approval": ["personal", "team-shared"] }
+    },
+    {
+      "id": "T4",
+      "role": "developer",
+      "sentence": "Any change that touches the checkout funnel must ship behind a feature flag.",
+      "reaches": { "basic": ["personal", "team-shared"], "approval": ["personal", "team-shared"] }
+    },
+    {
+      "id": "L1",
+      "role": "leader",
+      "sentence": "We approved a forty thousand dollar budget for the payments vendor migration next quarter.",
+      "reaches": { "basic": ["personal", "leadership-shared"], "approval": ["personal", "leadership-shared"] }
+    },
+    {
+      "id": "L2",
+      "role": "leader",
+      "sentence": "We will hire two senior backend engineers for the checkout team in Q4.",
+      "reaches": { "basic": ["personal", "leadership-shared"], "approval": ["personal", "leadership-shared"] }
+    },
+    {
+      "id": "L3",
+      "role": "leader",
+      "sentence": "Alice's mid-year performance review will focus on on-call ownership.",
+      "reaches": { "basic": ["personal", "leadership-shared"], "approval": ["personal", "leadership-shared"] }
+    },
+    {
+      "id": "L4",
+      "role": "leader",
+      "sentence": "Leadership decided to pause the new marketplace pilot until after Black Friday.",
+      "reaches": { "basic": ["personal", "leadership-shared"], "approval": ["personal", "leadership-shared"] }
+    },
+    {
+      "id": "W1",
+      "role": "leader",
+      "sentence": "Starting Monday, all production deploys require two reviewers.",
+      "reaches": { "basic": ["personal"], "approval": ["personal", "candidate"] }
+    },
+    {
+      "id": "W2",
+      "role": "leader",
+      "sentence": "Release freeze for checkout and payments begins Friday at 18:00 UTC and ends Monday morning.",
+      "reaches": { "basic": ["personal"], "approval": ["personal", "candidate"] }
+    },
+    {
+      "id": "N1",
+      "role": "developer",
+      "sentence": "I prefer a dark theme in my editor and keep the font size at 14.",
+      "reaches": { "basic": ["personal"], "approval": ["personal"] }
+    },
+    {
+      "id": "N2",
+      "role": "developer",
+      "sentence": "I keep my personal notes in a private Obsidian vault on my laptop.",
+      "reaches": { "basic": ["personal"], "approval": ["personal"] }
+    }
+  ]
+}

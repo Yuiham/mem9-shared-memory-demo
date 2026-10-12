@@ -10,6 +10,24 @@ export class ApiError extends Error {
   }
 }
 
+// Turns a server answer that no command expected into an error with a next step.
+export function toCliError(error) {
+  const what = `${error.where} (${error.status}): ${error.message}`;
+  if (error.status >= 500) {
+    return new CliError(`The mem9 server failed during ${what}`, {
+      next: 'Run the command again. Commands that create things pick up where they stopped.',
+    });
+  }
+  if (error.status === 401 || error.status === 403 || /api key/i.test(error.message)) {
+    return new CliError(`The mem9 server did not accept a key during ${what}`, {
+      next: 'The state in this working directory may belong to another server or may be out of date. See the troubleshooting guide.',
+    });
+  }
+  return new CliError(`The mem9 server rejected ${what}`, {
+    next: 'Check the command and its options, or see the troubleshooting guide.',
+  });
+}
+
 export function createApiClient(baseUrl, { toolName = 'sharedmem' } = {}) {
   async function request(method, path, { key, body, query, timeoutMs = 30000 } = {}) {
     const url = new URL(baseUrl + path);
@@ -46,7 +64,7 @@ export function createApiClient(baseUrl, { toolName = 'sharedmem' } = {}) {
     }
     if (!response.ok) {
       const message = (json && typeof json.error === 'string' ? json.error : text.slice(0, 200)) || `HTTP ${response.status}`;
-      throw new ApiError(response.status, message, `${method} ${path}`);
+      throw new ApiError(response.status, message, `${method} ${path.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, '<id>')}`);
     }
     return json;
   }

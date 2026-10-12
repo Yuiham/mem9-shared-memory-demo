@@ -1,0 +1,30 @@
+{
+  "about": "Seed memories are written word for word as pinned memories, with the Agent ID 'seed' and the tag 'seed'. 'space' is team-shared or leadership-shared.",
+  "memories": [
+    {
+      "id": "team-1",
+      "space": "team-shared",
+      "text": "Our default branch is main, and every pull request needs one approving review before it is merged."
+    },
+    {
+      "id": "team-2",
+      "space": "team-shared",
+      "text": "On-call handoff happens every Monday at 10:00, and the notes go in the #oncall-handoff channel."
+    },
+    {
+      "id": "team-3",
+      "space": "team-shared",
+      "text": "Feature flags for checkout changes are named checkout_<feature> and live in the config service."
+    },
+    {
+      "id": "leadership-1",
+      "space": "leadership-shared",
+      "text": "The leadership sync happens every Wednesday, and its notes are kept in the leadership folder."
+    },
+    {
+      "id": "leadership-2",
+      "space": "leadership-shared",
+      "text": "The annual planning offsite is scheduled for the second week of November."
+    }
+  ]
+}

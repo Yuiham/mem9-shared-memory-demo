@@ -1,0 +1,10 @@
+{
+  "participants": [
+    { "name": "lucia", "role": "leader" },
+    { "name": "marco", "role": "leader" },
+    { "name": "ana", "role": "developer" },
+    { "name": "bruno", "role": "developer" },
+    { "name": "carla", "role": "developer" },
+    { "name": "diego", "role": "developer" }
+  ]
+}

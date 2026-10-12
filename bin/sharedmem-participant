@@ -1,0 +1,25 @@
+#!/usr/bin/env node
+// Thin entry point. It checks the Node version first and only then loads the program,
+// so an old Node reaches the message below instead of a syntax error. It avoids
+// require and __dirname so that it parses and runs under both module systems.
+var NAME = 'sharedmem-participant';
+var major = Number(String(process.versions.node).split('.')[0]);
+if (major < 22) {
+  console.error(NAME + ': Node 22 or newer is required (this is Node ' + process.versions.node + '). Install a current Node and run this command again.');
+  process.exitCode = 1;
+} else {
+  Promise.all([import('node:fs'), import('node:path'), import('node:url')])
+    .then(function (modules) {
+      var self = modules[0].realpathSync(process.argv[1]);
+      var target = modules[1].join(modules[1].dirname(self), '..', 'src', 'participant', 'main.mjs');
+      return import(modules[2].pathToFileURL(target).href);
+    })
+    .then(function (program) { return program.main(process.argv.slice(2)); })
+    .then(
+      function (code) { process.exitCode = code; },
+      function (error) {
+        console.error(NAME + ': unexpected failure: ' + (error && error.message ? error.message : error));
+        process.exitCode = 1;
+      }
+    );
+}

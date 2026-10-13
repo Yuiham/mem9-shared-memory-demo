@@ -18,7 +18,7 @@ A Chain or Space key in the state is not known to the server. The usual causes a
 
 ### `Cannot reach the mem9 server`
 
-Check the address and your network first. A connection that is cut in the middle (`UND_ERR_SOCKET`, `ECONNRESET`) can also happen on a busy or distant server. Reads and deletions are retried twice on their own; a write is never repeated, because the server may have processed it, so the command stops and you run it again. `verify` removes the test Memories of every Case it started, including the one that was being written when the connection was cut. A server that is slow (a few seconds per call is normal on the development server; `verify` takes about five minutes for twelve Cases) is not an error.
+Check the address and your network first. A connection that is cut in the middle (`UND_ERR_SOCKET`, `ECONNRESET`) can also happen on a busy or distant server. Reads and deletions are retried twice on their own; a write is never repeated, because the server may have processed it, so the command stops and you run it again. `verify` removes the test Memories of every Case it started, including the one that was being written when the connection was cut. A server that is slow (a few seconds per call is normal on a remote server; `verify` takes about five minutes for twelve Cases) is not an error.
 
 ### I lost the state file
 

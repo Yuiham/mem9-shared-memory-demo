@@ -1,7 +1,7 @@
 // Stand-in for what the real `claude plugin install <plugin> --scope local` does to the
 // project: it merges `enabledPlugins` into .claude/settings.local.json (keeping every
-// other setting and the file's mode). Observed with the real Claude Code inside the
-// isolated Linux machine; a program that rewrites the file from settings it read
+// other setting and the file's mode). Observed with the real Claude Code in a
+// disposable Linux environment; a program that rewrites the file from settings it read
 // before the install loses this entry and leaves the plugin disabled.
 import fs from 'node:fs';
 import path from 'node:path';

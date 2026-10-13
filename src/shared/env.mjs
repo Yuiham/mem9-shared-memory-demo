@@ -54,7 +54,7 @@ export function loadServerUrl({ workdir, env }) {
   } catch (error) {
     if (error.code === 'ENOENT') {
       throw new CliError(`${SERVER_VARIABLE} is not set and there is no .env file in ${workdir}.`, {
-        next: 'Copy .env.example to .env and set SHAREDMEM_API_URL to the development server address.',
+        next: 'Copy .env.example to .env and set SHAREDMEM_API_URL to the mem9 server address.',
       });
     }
     throw error;
@@ -62,7 +62,7 @@ export function loadServerUrl({ workdir, env }) {
   const value = parseEnvFile(text)[SERVER_VARIABLE];
   if (!value) {
     throw new CliError(`The .env file does not define ${SERVER_VARIABLE}.`, {
-      next: 'Add a line SHAREDMEM_API_URL=<development server address> to the .env file.',
+      next: 'Add a line SHAREDMEM_API_URL=<mem9 server address> to the .env file.',
     });
   }
   return normalizeUrl(value);

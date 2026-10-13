@@ -83,5 +83,5 @@ test('no file in the repository holds a real address, a home-directory path or a
 });
 
 test('the committed example environment file holds a placeholder, not an address', () => {
-  assert.match(read('.env.example'), /SHAREDMEM_API_URL=https:\/\/mem9-dev\.example\.com\s*$/m);
+  assert.match(read('.env.example'), /SHAREDMEM_API_URL=https:\/\/mem9\.example\.com\s*$/m);
 });

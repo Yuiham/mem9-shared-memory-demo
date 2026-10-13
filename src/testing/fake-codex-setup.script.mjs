@@ -65,7 +65,7 @@ if (group === 'profile' && command === 'save-key') {
   const file = path.join(mem9Home, '.credentials.json');
   const existing = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : { profiles: {} };
   existing.profiles[options.profile] = { baseUrl: options['base-url'] ?? '', apiKey: process.env[options['api-key-env']] };
-  // Like the real script (observed in the isolated Linux machine): the file is created
+  // Like the real script (observed with the real plugin in a disposable Linux environment): the file is created
   // with the default mode, so it is readable by other users of the computer, and the
   // reported path is the literal text "$MEM9_HOME/.credentials.json".
   if (process.env.STANDIN_SETUP_NO_CREDENTIALS_FILE !== '1') {

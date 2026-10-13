@@ -268,7 +268,7 @@ test('--wait must be a number of seconds', async (t) => {
   assert.match(help.stdout, /Candidate/);
 });
 
-// Found on the real dev server: a connection that the network cut once made a whole run
+// Found against a real server: a connection that the network cut once made a whole run
 // stop, and the Case being written was not tidied up.
 const verifyMemories = (h) => h.fake.spaceIds().flatMap((id) => h.fake.memoriesIn(id)).filter((memory) => memory.agent_id.startsWith('verify-'));
 

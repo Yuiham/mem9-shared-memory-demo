@@ -1,10 +1,27 @@
 # Shared-memory demo
 
-This demo shows how mem9 shared memory (Space Chains) works for a small team. Each person talks to their own coding agent, Claude Code or Codex. What the whole team should know flows into a **Team Shared** space. What only leaders should know goes to a **Leadership Shared** space that developers cannot read. Personal preferences stay personal.
+A hands-on demo of mem9 shared memory (Space Chains) for a small team. Each person works with their own coding agent, Claude Code or Codex, and mem9 decides which memories reach which people:
 
-Use it to rehearse a team on a mem9 server, check that the routing rules do what you intend, and hand each person a ready-to-run Kit. Two small command-line programs do the work, with no dependencies beyond Node 22 or newer.
+- **Team knowledge** goes to a shared space everyone reads (**Team Shared**).
+- **Leadership matters** go to a shared space only leaders read (**Leadership Shared**).
+- **Personal preferences** stay in each person's own space.
 
-Four words come up below. A **Space** stores Memories. A **Chain** lets one person read several Spaces as one: their own and the shared ones. A **Kit** is the folder you give one person. An **Example** is one of two routing setups, Basic or Approval. [Concepts](docs/concepts.md) explains them fully.
+Use it to:
+
+- rehearse a team on a mem9 server;
+- check that the routing does what you intend;
+- hand each person a ready-to-run Kit.
+
+Two small command-line programs do the work. They need Node 22 or newer and nothing else.
+
+Four words you will meet:
+
+- **Space**: stores Memories.
+- **Chain**: lets one person read several Spaces as one, their own and the shared ones.
+- **Kit**: the folder you give one person.
+- **Example**: one of two routing setups, Basic or Approval.
+
+[Concepts](docs/concepts.md) explains them in full.
 
 ## What you will see
 
@@ -17,7 +34,9 @@ flowchart LR
   L -. "Approval Example: proposed,<br/>saved after approval" .-> TS
 ```
 
-Only lasting facts are saved. A developer's Chain holds their Personal space and Team Shared; a leader's Chain also holds Leadership Shared, which is why developers cannot read it. For each fact, a language model reads a short prompt per shared space, which you can edit, and decides whether the fact belongs there. Chatter is ignored.
+- Only lasting facts are saved. Chatter is ignored.
+- A person's Chain sets what they can read. A developer's Chain holds their Personal space and Team Shared; a leader's also holds Leadership Shared.
+- A language model decides which facts are copied into a shared space. It reads one short prompt per shared space, and you can edit the prompts.
 
 | Someone says | It is saved in |
 | --- | --- |
@@ -32,11 +51,14 @@ Only lasting facts are saved. A developer's Chain holds their Personal space and
 - The address of a mem9 server that has the Space Chain API (the `server/` of [mem9-ai/mem9](https://github.com/mem9-ai/mem9) serves it under `/v1alpha2/space-chains`). The Administrator needs it; each Kit already carries it.
 - Claude Code or Codex on each Participant's computer.
 
-Every person and every sentence in the demo is fictional. A server may use plain HTTP, so never type anything real.
+> **Use fictional data only.** A mem9 server may use plain HTTP, so never type anything real.
 
 ## The flow
 
-There are two roles. The **Administrator** builds the environment and hands out Kits. A **Participant** receives a Kit, connects their coding agent with it and then uses the agent as usual.
+Two roles take part:
+
+- The **Administrator** builds the environment and hands out Kits.
+- A **Participant** receives a Kit, connects their coding agent with it, then uses the agent as usual.
 
 ```mermaid
 flowchart LR
@@ -53,46 +75,87 @@ flowchart LR
 
 ### 1. Build the environment (Administrator)
 
-`init` creates what the demo needs on the server: a Personal space and a Chain for every person, the two shared spaces, the three routing prompts from `config/routing-prompts/` and a few Seed memories for the sample questions to find. It shows its plan and asks before it changes anything. It takes a minute or two.
+Create everything the demo needs on the server.
 
 ```
-cp .env.example .env          # then set SHAREDMEM_API_URL in .env to your server (git ignores the file)
+cp .env.example .env          # set SHAREDMEM_API_URL in .env to your server (git ignores the file)
 ./bin/sharedmem-admin init
 ```
 
+`init` creates:
+
+- a Personal space and a Chain for every person;
+- the two shared spaces;
+- the three routing prompts, from `config/routing-prompts/`;
+- a few Seed memories for the sample questions to find.
+
+It shows its plan and asks before it changes anything. It takes a minute or two.
+
 ### 2. Check the routing (Administrator)
 
-Routing is a language model reading a short prompt per shared space, so check it before anyone depends on it. `verify` sends 12 sample sentences through the real routing and compares where each one landed with where it should. It takes a few minutes and removes the Memories it wrote.
+Routing is a language model reading a prompt, so check it before anyone depends on it.
 
 ```
 ./bin/sharedmem-admin verify
 ```
 
-A language model makes the decision, so one run can differ from the next: run `verify` once more before you change anything. If a Case keeps failing, [tune the routing prompts](#tune-the-routing-prompts).
+`verify`:
+
+- sends 12 sample sentences through the real routing;
+- compares where each one landed with where it should;
+- removes the Memories it wrote.
+
+It takes a few minutes. A language model makes the decision, so one run can differ from the next: if a Case fails, run `verify` once more before you change anything. If it keeps failing, [tune the routing prompts](#tune-the-routing-prompts).
 
 ### 3. Hand out the Kits (Administrator)
 
-`export` builds one Kit per person in `out/kits/<name>/`: the Participant program, that person's own key, their sample sentences and a guide. Send each person only their own Kit, for example as a zip. A Kit holds a key, so it is a secret.
+Give each person what they need to connect, and nothing else.
 
 ```
 ./bin/sharedmem-admin export
 ```
 
-To rehearse alone, run one Kit yourself in a scratch directory (step 4).
+`export` builds one Kit per person in `out/kits/<name>/`. A Kit holds:
+
+- the Participant program;
+- that person's own key;
+- their sample sentences;
+- a guide.
+
+Send each person only their own Kit, for example as a zip. A Kit holds a key, so treat it as a secret. To rehearse alone, run one Kit yourself in a scratch directory (step 4).
 
 ### 4. Connect the agent (Participant)
 
-The Participant opens their Kit and runs its program. It asks which agent (Claude Code or Codex) and which project directory, shows what it will change and waits for a yes. It installs the mem9 plugin for that project and writes the server address, the person's key and their name there. For Codex it also saves a profile in the user's mem9 folder and may run `git init` in the project; it lists every change before it asks. It never starts the agent, and when it finishes it prints the directory to open, the sample sentences and the sample question.
+Connect the person's coding agent to the shared memory.
 
 ```
 ./bin/sharedmem-participant
 ```
 
+The program:
+
+- asks which agent (Claude Code or Codex) and which project directory;
+- shows what it will change and waits for a yes;
+- installs the mem9 plugin for that project, with the server address, the person's key and their name;
+- prints the directory to open, the sample sentences and the sample question.
+
+It never starts the agent.
+
+Codex also needs changes outside the project: the plugin's user-level credentials file, which holds the key, and the user's Codex hook files. The program may also run `git init` in the project. The plan lists every change before it asks.
+
 ### 5. Use the agent (Participant)
 
-The Participant starts the agent from the configured directory, says the sample sentences the program printed in a normal chat and, after about a minute, asks the sample question. Developers find what the team knows and never see Leadership Shared. Leaders see both. The Kit's guide, which is [docs/participant-guide.md](docs/participant-guide.md), has the details.
+Try it as a normal user:
+
+1. Start the agent from the directory the program printed.
+2. Say the sample sentences in a normal chat.
+3. After about a minute, ask the sample question.
+
+Developers find what the team knows and never see Leadership Shared. Leaders see both. The Kit's guide has the details; it is [docs/participant-guide.md](docs/participant-guide.md).
 
 ### 6. Watch it land (Administrator)
+
+See where the sentences ended up.
 
 ```
 ./bin/sharedmem-admin memories                 # Memory counts per space
@@ -104,7 +167,7 @@ When the rehearsal is over, `./bin/sharedmem-admin teardown` deletes the Chains.
 
 ## Tune the routing prompts
 
-The routing prompts decide what reaches Team Shared and Leadership Shared. They are three plain-text files in `config/routing-prompts/`:
+The prompts decide what reaches the shared spaces. They are plain-text files in `config/routing-prompts/`:
 
 | File | Decides |
 | --- | --- |
@@ -112,11 +175,20 @@ The routing prompts decide what reaches Team Shared and Leadership Shared. They 
 | `leadership-shared-auto.txt` | Which of a Leader's facts are copied to Leadership Shared |
 | `team-shared-approval.txt` | Which of a Leader's facts are proposed to Team Shared (Approval Example only) |
 
-Change one when `verify` keeps failing or when you want the team to behave differently: edit the file (plain text, at most 1,200 characters), run `init` to apply it (Chains, keys and Kits stay as they are), then run `verify` again. [Routing prompts](docs/routing-prompts.md) explains how to write a good one and how the Cases check it.
+To change one:
+
+1. Edit the file: plain text, at most 1,200 characters.
+2. Run `init` to apply it. Chains, keys and Kits stay as they are.
+3. Run `verify` again.
+
+Do this when `verify` keeps failing, or when you want the team to behave differently. [Routing prompts](docs/routing-prompts.md) explains how to write a good prompt and how the Cases check it.
 
 ## The Approval Example
 
-The default is the **Basic** Example. In the **Approval** Example a leader's team-wide announcement is not published to Team Shared. It becomes a **Candidate** that the Administrator approves first, which shows how a mem9 server can hold a fact back for a person to decide. You can switch back and forth without changing any key, and Kits already handed out keep working (run `export` again to refresh the Example named inside them).
+The default is the **Basic** Example. The **Approval** Example changes one thing: a leader's team-wide announcement is not published to Team Shared. It becomes a **Candidate** that the Administrator approves first. This shows how a mem9 server can hold a fact back for a person to decide.
+
+- You can switch between the two without changing any key.
+- Kits already handed out keep working. Run `export` again to refresh the Example named inside them.
 
 ```
 ./bin/sharedmem-admin init --example approval
@@ -131,14 +203,16 @@ Real deliveries from the server need a public HTTPS address, such as a tunnel to
 
 ## Make it your own
 
-Everything the demo ships is a plain file under `config/`, and each command explains what it changes with `--help`.
+Everything the demo ships is a plain file under `config/`. Each command explains what it changes with `--help`.
 
 | To change | Edit | Then |
 | --- | --- | --- |
 | Who takes part (default: 2 leaders, 4 developers) | `config/cast.json`, or `init --cast <file>` (pass it on every `init`) | `init`, then `export` |
 | What gets routed where | `config/routing-prompts/*.txt` | `init`, then `verify` |
-| The sentences `verify` checks; Cases named T1, L1, W1, N1 and so on are also handed to people | `config/cases.json` (`verify --cases <file>` checks another file once) | `verify`, then `export` |
+| The sentences `verify` checks, which are also handed to people | `config/cases.json` (`verify --cases <file>` checks another file once) | `verify`, then `export` |
 | The facts the sample questions find | `config/seed-memories.json` | `init` |
+
+Only Cases whose ids are a letter and a number (`T1`, `L1`, `W1`, `N1` and so on) are handed to people.
 
 ## Documentation
 
@@ -151,7 +225,9 @@ Everything the demo ships is a plain file under `config/`, and each command expl
 
 ## Development
 
-`pnpm test` runs the suite. The tests are hermetic: they start the real programs against a fake mem9 server on a local port and stand-in `claude` and `codex` commands, inside a temporary directory. [AGENTS.md](AGENTS.md) describes the layout rules and conventions.
+- `pnpm test` runs the suite.
+- The tests are hermetic: they start the real programs against a fake mem9 server on a local port, with stand-in `claude` and `codex` commands, inside a temporary directory.
+- [AGENTS.md](AGENTS.md) describes the layout rules and conventions.
 
 ```
 bin/        the two launchers

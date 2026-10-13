@@ -54,8 +54,9 @@ A person's Kit holds only their Chain API key. The Administrator holds every key
 After a person says something:
 
 1. The server extracts durable facts into their Personal space.
-2. For each other node of their Chain, a language model decides whether the fact belongs there. It reads the node's **Routing prompt**, a short instruction such as "send lasting engineering knowledge the whole team should follow", and judges by meaning, in English, Spanish or Portuguese.
-3. What happens next depends on the node's **Node mode**, which the server stores as its routing rule:
+2. Each other node of their Chain takes part in routing according to its **Node mode**, which the server stores as its routing rule. A Read-only node takes nothing.
+3. For a node that takes part, a language model reads the node's **Routing prompt**, a short instruction such as "send lasting engineering knowledge the whole team should follow", and decides by meaning, in English, Spanish or Portuguese, whether the fact belongs there.
+4. A matching fact is copied or held back, depending on the Node mode:
 
 | Node mode | Routing rule | What happens |
 | --- | --- | --- |

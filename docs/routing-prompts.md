@@ -3,10 +3,16 @@
 How routing works in short:
 
 1. A person says something lasting, and mem9 saves the fact in their Personal space.
-2. For each shared space in their Chain, a language model answers one question: does this fact belong there? The **routing prompt** of that space is the question.
-3. In this demo the prompts are three plain-text files, so changing what reaches Team Shared or Leadership Shared means editing one of them.
+2. For each shared space in their Chain, a language model answers one question: does this fact belong there? The **Routing prompt** of that space is the question.
 
-A prompt only decides what is copied into a shared space. Who can read a space is decided by the Chain: a Developer's Chain has no Leadership Shared, so no prompt can send a Developer anything from it. The idea behind Node modes and routing is in [Concepts](concepts.md#routing-prompts-and-node-modes).
+In this demo the Routing prompts are three plain-text files, so changing what reaches Team Shared or Leadership Shared means editing one of them.
+
+What a prompt does not decide:
+
+- It only decides what is copied into a shared space.
+- Who can read a space is decided by the Chain. A Developer's Chain has no Leadership Shared, so no prompt can send a Developer anything from it.
+
+The idea behind Node modes and routing is in [Concepts](concepts.md#routing-prompts-and-node-modes).
 
 ## The three prompts
 
@@ -25,7 +31,7 @@ In the Basic Example the Team Shared node of a Leader's Chain is read-only and u
 3. Run `./bin/sharedmem-admin verify` and read the table of expected against actual.
 4. Repeat until the Cases pass.
 
-Good to know:
+After you change a prompt:
 
 - A new prompt applies to what people say from then on. Memories already saved stay where they are.
 - A change can take a few minutes to show on the server (see [Known gaps](known-gaps.md)).
@@ -48,7 +54,7 @@ The shipped prompts are about 400 characters each. They follow a pattern worth k
 - **W**: team-wide announcements a Leader makes. Basic keeps them in the Leader's Personal space; Approval proposes them to Team Shared.
 - **N**: personal preferences. They stay in the Personal space.
 
-`export` also hands these sentences to people: the Cases whose ids are a letter and a number (T1, L2, W1, N1) are picked by role and position. To try your own sentences once, run `verify --cases <file>` with a file of the same shape. The file is checked completely before anything is sent.
+`export` also hands these sentences to people: the Cases whose ids are `T`, `L`, `W` or `N` followed by a number (T1, L2, W1, N1) are picked by role and position. To try your own sentences once, run `verify --cases <file>` with a file of the same shape. The file is checked completely before anything is sent.
 
 A language model makes the decision, so one run can differ from the next:
 

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { approvalDemo } from '../testing/approval.support.mjs';
 import { FakeMem9 } from '../testing/fake-mem9.support.mjs';
 import { SMALL_CAST, withHarness } from '../testing/harness.support.mjs';
 
@@ -349,6 +350,32 @@ test('a participant name of exactly 100 characters is accepted', async (t) => {
   const result = await h.admin(['init', '--cast', cast, '--yes']);
   assert.equal(result.code, 0, result.output);
   assert.ok(h.readState().chains[longest]);
+});
+
+test('a Chain created again in the Approval Example warns that its webhook registration is gone', async (t) => {
+  const { h } = await approvalDemo(t, { receiver: false });
+  h.fake.chainByName('sharedmem-demo-lucia').deleted = true;
+  const result = await h.admin(['init', '--yes']);
+  assert.equal(result.code, 0, result.output);
+  assert.match(result.stderr, /lucia.*webhook/s);
+  assert.match(result.stderr, /webhook set/);
+  const { webhooks } = h.readState();
+  assert.equal(webhooks.lucia, undefined, 'the old registration belonged to the old Chain');
+  assert.ok(webhooks.marco, 'the other Leader keeps its registration');
+});
+
+test('creating a Chain again says the exported Kits are out of date, but only when Kits exist', async (t) => {
+  const { h } = await initialized(t);
+  h.fake.chainByName('sharedmem-demo-ana').deleted = true;
+  const withoutKits = await h.admin(['init', '--yes']);
+  assert.equal(withoutKits.code, 0, withoutKits.output);
+  assert.doesNotMatch(withoutKits.stdout, /out of date/);
+  assert.equal((await h.admin(['export'])).code, 0);
+  h.fake.chainByName('sharedmem-demo-bruno').deleted = true;
+  const withKits = await h.admin(['init', '--yes']);
+  assert.equal(withKits.code, 0, withKits.output);
+  assert.match(withKits.stdout, /Kits.*out of date/s);
+  assert.match(withKits.stdout, /sharedmem-admin export/);
 });
 
 test('a state file that is not valid JSON is refused by every command and left untouched', async (t) => {

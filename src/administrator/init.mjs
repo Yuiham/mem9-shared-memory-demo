@@ -1,5 +1,7 @@
 // init: creates or reuses the Spaces and Chains for the cast, applies the Routing prompts
 // and the chosen Example, and writes the Seed memories that are not there yet.
+import fs from 'node:fs';
+import path from 'node:path';
 import { CliError, parseOptions, renderHelp, UsageError } from '../shared/cli.mjs';
 import { confirm } from '../shared/prompt.mjs';
 import { ApiError } from '../shared/http.mjs';
@@ -74,16 +76,19 @@ async function provisionSpaces({ ctx, participants }) {
   }
 }
 
+// Returns true when the registered webhook of an earlier Chain was lost with it.
 async function createChain({ ctx, person }) {
   const { store, mem9 } = ctx;
   const created = await mem9.createChain(chainNameFor(person.name), `Shared-memory demo Chain for ${person.name}`);
   store.state.chains[person.name] = { id: created.chain.id, name: created.chain.name, key: created.chain_api_key, nodes: [] };
   // A webhook belongs to the old Chain; the new one has none.
+  const lostWebhook = Boolean(store.state.webhooks[person.name]);
   delete store.state.webhooks[person.name];
   store.save();
+  return lostWebhook;
 }
 
-async function configureChain({ ctx, person, example, prompts }) {
+async function configureChain({ ctx, person, example, prompts, created }) {
   const { store, mem9, io } = ctx;
   const { state } = store;
   let known = null;
@@ -91,8 +96,12 @@ async function configureChain({ ctx, person, example, prompts }) {
     known = await mem9.chainByKey(state.chains[person.name].key);
   } catch (error) {
     if (!(error instanceof ApiError) || error.status !== 404) throw error;
-    await createChain({ ctx, person });
+    const lostWebhook = await createChain({ ctx, person });
+    created.push(person.name);
     io.out(`  the server no longer knows the Chain of ${person.name}; a new Chain was created again on the same Spaces (its key changed, so export the Kits again)`);
+    if (lostWebhook) {
+      io.warnOnce(`webhook-lost-${person.name}`, `The webhook registered on the old Chain of ${person.name} is gone with it. Run \`sharedmem-admin webhook set\` again to register one on the new Chain (the Approval Example needs it).`);
+    }
   }
   const chain = state.chains[person.name];
   const layout = nodeLayout(person, example, prompts);
@@ -175,13 +184,21 @@ export async function run(argv, { io, env, program }) {
 
   io.out('Working:');
   await provisionSpaces({ ctx, participants });
-  for (const person of participants) if (!store.state.chains[person.name]) await createChain({ ctx, person });
-  for (const person of participants) await configureChain({ ctx, person, example, prompts });
+  const created = [];
+  for (const person of participants) {
+    if (store.state.chains[person.name]) continue;
+    await createChain({ ctx, person });
+    created.push(person.name);
+  }
+  for (const person of participants) await configureChain({ ctx, person, example, prompts, created });
   await writeSeeds({ ctx, seeds });
   store.save();
 
   io.out('');
   io.out(`Done: ${plural(Object.keys(store.state.spaces).length, 'Space')} and ${plural(participants.length, 'Chain')} are ready for the ${example === 'basic' ? 'Basic' : 'Approval'} Example.`);
+  if (created.length > 0 && fs.existsSync(path.join(ctx.workdir, 'out', 'kits'))) {
+    io.out('Note: the Kits in out/kits are out of date, because a Chain was created again. Run `sharedmem-admin export` to build them again before handing them out.');
+  }
   io.out(`Next step: ${HELP.next.replace(/^Run /, 'run ')}`);
   return 0;
 }

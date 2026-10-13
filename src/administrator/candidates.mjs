@@ -85,6 +85,7 @@ function reject(id, { io, env, values }) {
     throw new CliError(`Candidate ${id} was decided by another process.`, { next: 'Run `sharedmem-admin candidates` to see its state.' });
   }
   io.out(`Rejected ${id}. Nothing was written to the server.`);
+  io.out('Next step: run `sharedmem-admin candidates` to see what else is waiting.');
   return 0;
 }
 

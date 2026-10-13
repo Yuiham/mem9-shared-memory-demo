@@ -136,6 +136,7 @@ test('reject marks the Candidate rejected and writes nothing to the server', asy
   assert.equal(demo.candidates().candidates[0].status, 'rejected');
   assert.equal(demo.h.fake.requestsTo('POST', '/v1alpha2/mem9s/memories').length, before);
   assert.equal(teamMemories(demo).length, 0);
+  assert.match(result.stdout, /^Next step: /m, 'every command ends with a next step');
 });
 
 // ---- the Candidates file ------------------------------------------------------------

@@ -46,7 +46,17 @@ test('the Administrator guide has a section for every command', async (t) => {
   const commands = [...overview.stdout.matchAll(/^ {2}(\S+)\s{2,}/gm)].map((match) => match[1]);
   assert.ok(commands.length >= 9, 'the overview lists the commands');
   const guide = read('docs/administrator-guide.md');
-  for (const command of commands) assert.match(guide, new RegExp(`^### \`${command}[ \`]`, 'm'), `the guide documents ${command}`);
+  for (const command of commands) {
+    assert.match(guide, new RegExp(`^### \`${command}[ \`]`, 'm'), `the guide documents ${command}`);
+    assert.match(guide, new RegExp(`^\\| \`${command}[ \`]`, 'm'), `the overview table has a row for ${command}`);
+  }
+});
+
+test('the Participant guide stands alone inside a Kit: it links to no other file', () => {
+  const guide = read('docs/participant-guide.md');
+  for (const [, target] of guide.matchAll(/\[[^\]]*\]\(([^)\s]+)\)/g)) {
+    assert.match(target, /^(https?:\/\/|#)/, `the guide links to ${target}, which does not exist inside a Kit`);
+  }
 });
 
 test('the documentation is written for people: no unfinished markers', () => {

@@ -1,15 +1,39 @@
 # Shared-memory demo
 
-A demo that shows how to configure, use and test mem9 shared memory (a Space Chain) with a small team. Two programs: `sharedmem-admin` sets up and checks a team's Spaces on a mem9 server; `sharedmem-participant` configures one person's Codex or Claude Code. Everything in the repository is English.
+A demo of mem9 shared memory (Space Chains) for a small team. `sharedmem-admin` prepares a mem9 server and hands out one Kit per person; `sharedmem-participant`, shipped inside each Kit, connects one person's Claude Code or Codex. [README.md](README.md) explains the flow. Capitalized terms (Space, Chain, Kit, Case, Example) are defined in [docs/concepts.md](docs/concepts.md). Everything in the repository is English.
 
-## Rules that do not show in the code
+## Commands
 
-- Node 22 or newer, no dependencies, no lockfile. Use pnpm for scripts (`pnpm test`); never npm or yarn.
-- Source is ESM `.mjs`. Launchers in `bin/` avoid `require` and `__dirname` and check the Node version before importing anything.
-- Module direction is enforced by `src/structure.test.mjs`: `administrator` and `participant` import only themselves and `shared`; `shared` imports only itself; only tests import `testing`.
-- Tests sit beside the code they cover (`*.test.mjs`); helpers are `*.support.mjs`. Tests start the real launchers as child processes through `src/testing/harness.support.mjs` against the fake mem9 server and the stand-in `claude` and `codex` commands.
-- A test touches nothing outside its own temporary directory and never runs the real `claude` or `codex`. Checks of the real plugin installs run by hand inside the isolated Linux machine, never on the developer's machine.
-- The real server address lives only in the gitignored `.env`. Keep it, every key and every person's real name out of the repository, test data, docs and command output. Use fictional data.
-- State and person files hold keys: write them owner-only (mode 600) and keep them out of git.
-- Every command says what it did and ends with a next step; errors name the next step too. `--help` of each command lists what it changes. Only the commands that make wide changes (`init`, `teardown` and the Participant program) show a plan and ask first, or take `--yes`; without a terminal a missing confirmation or choice is a usage error (exit code 2) naming the flag. The other commands change only what their name says (one webhook, one Candidate, the files in `out/`, the Memories of one `verify` run) and do not ask.
-- Documentation is `README.md` plus `docs/`; `docs/participant-guide.md` is also the Kit's README. `src/docs.test.mjs` checks that every guide exists, links resolve, every command has a section in the Administrator guide, and no file holds a real address, home path or key. Update the guide when a command's behavior changes.
+- `pnpm test` runs the whole suite, which is `node --test "src/**/*.test.mjs"`. `node --test <file>` runs one file. There is nothing to install.
+- Running the programs by hand writes `state/` and `out/` in the repository. Pass `--workdir <directory>` (or set `SHAREDMEM_WORKDIR`) to keep scratch runs elsewhere. The server cannot list or delete Spaces, so the state file is the only record of what a run created.
+
+## Secrets
+
+- The server address lives only in the git-ignored `.env`. Keys and the address stay out of output (they are masked), the repository, test data and docs. Use fictional people and data.
+- Files that hold keys (`state/`, Kits, person files) are written owner-only (mode 600) and stay out of git.
+- `src/docs.test.mjs` scans every file for common real-looking hosts, home-directory paths and key shapes. It catches the usual slips, not every one.
+
+## Architecture
+
+- Node 22 or newer, ESM `.mjs`, no dependencies and no lockfile; `src/structure.test.mjs` enforces both and rejects imports of anything not built into Node. The launchers in `bin/` use no `require` or `__dirname` and check the Node version before they import anything, so an old Node fails with a clear message.
+- `administrator` and `participant` import only themselves and `shared`; `shared` imports only itself; `testing` imports only itself; only tests import `testing`. `src/structure.test.mjs` enforces these directions.
+- A Kit ships `participant` and the `shared` files it imports, found by reading the imports. Only flat files named with lowercase letters and hyphens (`src/participant/*.mjs`, `src/shared/*.mjs`) can ship, so a subfolder or a digit in a file name breaks `export`.
+- Names that several modules must agree on (the event type, the Agent ID prefixes, the placeholder address rule) live in `src/shared/names.mjs`.
+
+## Command-line conventions
+
+- A command describes itself with `renderHelp` (a spec with `changes` and `next`) and fails with `CliError` or `UsageError`, which carry a `next`. Every command ends with a next step and every error names one.
+- `init`, `teardown` and the Participant program change a lot at once, so they show a plan and ask first; `--yes` answers yes. Without a terminal, a missing confirmation or choice is a usage error (exit code 2) that names the flag to pass.
+- The other commands act on the one thing their name says (`export` rebuilds `out/`, `verify` writes and removes its own test Memories) and do not ask. Their `--help` lists what they change.
+
+## Tests
+
+- Tests sit beside the code (`*.test.mjs`); helpers are `*.support.mjs`.
+- Integration tests are hermetic. Each starts the real launchers as child processes (`src/testing/harness.support.mjs`) against a fake mem9 server on a local port and stand-in `claude` and `codex` commands, inside its own temporary directory. No test uses the network, a real `claude` or `codex`, or the home directory. The other tests read files or call modules directly.
+- The stand-ins copy behavior observed with the real plugins. When a real plugin behaves differently, change the stand-in to match, add the test, fix the program, and record what you observed in the commit message.
+- The fake server routes by regular expressions that mirror the sentences of the shipped Cases (`SHIPPED_ROUTING` in the harness). Change a Case and its expression together.
+
+## Docs
+
+- Keep the docs in step with behavior. A new guide goes in `GUIDES` in `src/docs.test.mjs` and gets a link in the README; `TODO`-style markers fail that test.
+- `docs/participant-guide.md` doubles as every Kit's README, so it uses no relative links.

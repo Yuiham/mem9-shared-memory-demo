@@ -11,7 +11,7 @@ The Administrator prepares the environment on a mem9 server, checks the routing,
 - **Node 22 or newer** (`node --version`). No dependencies, nothing to install.
 - **The server address.** Copy `.env.example` to `.env` and set `SHAREDMEM_API_URL` to the mem9 server's address.
   - A variable already set in your shell wins over the file.
-  - The address is masked in all output and never written anywhere else.
+  - The address is masked in all output. Besides `.env`, it is stored in `state/state.json` and in each Kit's `person.json`.
   - If it starts with `http://`, the programs warn once per run: traffic is not encrypted, so use fictional data only.
 - **The state file.** `state/state.json` (created by `init`) records every key. Treat it as a secret and do not lose it (see [Troubleshooting](troubleshooting.md#i-lost-the-state-file)).
 
@@ -52,7 +52,7 @@ By default the demo has two Leaders (`lucia`, `marco`) and four Developers (`ana
 { "participants": [ { "name": "lucia", "role": "leader" }, { "name": "ana", "role": "developer" } ] }
 ```
 
-The file is not remembered, so pass it on every `init`; a plain `init` reads `config/cast.json` again.
+A file passed with `--cast` is not remembered, so pass it on every `init`; a plain `init` reads `config/cast.json` again.
 
 The rules:
 
@@ -64,18 +64,18 @@ The rules:
 
 ## Commands
 
-| Command | Use it to | Changes |
+| Command | Use it to | What it changes |
 | --- | --- | --- |
-| `init` | Build or update the environment | Server: Spaces, Chains, routing, Seed memories. Local: `state/` |
-| `verify` | Check the routing | Server: test Memories, removed afterwards |
+| `init` | Build or update the environment | Server: Spaces, Chains, routing, Seed memories. Local: `state/state.json` |
+| `verify` | Check the routing | Server: test Memories, removed afterwards. Local: test Candidates, only if a receiver is running |
 | `memories` | See where Memories landed | Nothing |
-| `export` | Build one Kit per person | `out/` |
-| `webhook set` | Register the Approval Example's endpoints | Server: endpoints. Local: signing secrets in `state/` |
+| `export` | Build one Kit per person | Local: `out/kits/` and `out/report.md` |
+| `webhook set` | Register the Approval Example's endpoints | Server: webhook endpoints. Local: signing secrets in `state/state.json` |
 | `webhook deliveries` | See what the server tried to deliver | Nothing |
-| `receiver serve` | Receive the server's deliveries | `state/candidates.json`, `state/receiver.json` |
-| `candidates` | List, approve or reject announcements | `approve` writes to Team Shared; `state/candidates.json` |
-| `simulate` | Show approval without a public address | A Candidate marked simulated |
-| `teardown` | Delete the Chains | Server: Chains. Local: `state/` |
+| `receiver serve` | Receive the server's deliveries | Local: `state/candidates.json` and `state/receiver.json` |
+| `candidates` | List, approve or reject announcements | `list`: nothing. `approve`: a pinned Memory in Team Shared, and `state/candidates.json`. `reject`: `state/candidates.json` |
+| `simulate` | Show approval without a public address | Local: the receiver stores a simulated Candidate in `state/candidates.json` |
+| `teardown` | Delete the Chains | Server: the Chains. Local: removes them from `state/state.json` |
 
 ### `init`
 
@@ -89,7 +89,7 @@ Creates or reuses the whole environment:
 Before any server call it validates the cast, the Example and the length of every Routing prompt. Then it shows its plan and asks. `--yes` skips the question; without a terminal and without `--yes` it fails and says so.
 
 - `--example basic|approval` chooses the Example. The first run defaults to Basic; a re-run without the flag keeps the recorded one.
-- Safe to re-run: what exists is reused, and a Chain whose nodes already match is untouched. A Chain the server no longer knows is created again on the same Spaces; its key changes, so export the Kits again.
+- Safe to re-run: what exists is reused. A Chain whose nodes already match keeps them, and only routing rules that differ are updated. A Chain the server no longer knows is created again on the same Spaces; its key changes, so export the Kits again.
 - Switching Examples changes one routing rule in place. Chains and keys stay the same, so Kits already handed out keep connecting. Run `export` again to refresh the Example label inside them.
 - It warns when you apply Approval with no webhook registered, because announcements would be lost.
 
@@ -102,19 +102,21 @@ How it checks a Case:
 - It writes the Case through the Chain of the first person with the speaker's role, under its own Agent ID `verify-<run>-<case>`, using the server's synchronous write.
 - It reads back the speaker's Personal space, Team Shared and Leadership Shared.
 - Afterwards it removes everything it wrote, of every Memory type.
-- A routing step that fails on the server still lets the write succeed, so a missing copy is reported as a failure.
+
+A routing step that fails on the server still lets the write succeed, so a missing copy is reported as a failure.
 
 In the Approval Example:
 
 - A Case that should become a Candidate passes when nothing reached Team Shared and the server recorded a new routed-fact delivery for the Chain.
 - If the receiver is running and the webhook address is a real one, the matching Candidate must also arrive. It is a test Candidate, hidden from the default `candidates` listing.
 - Without a registered webhook these Cases are skipped with a notice.
-- `--wait <seconds>` (default 15) sets how long to wait for the delivery record and the Candidate.
 
-Other options and caveats:
+Options:
 
+- `--wait <seconds>` (default 15) sets how long the Approval Example waits for the delivery record and the Candidate.
 - `--cases <file>` replaces the shipped Cases, for a spot check with fresh sentences. The file has the same fields as `config/cases.json` and is validated completely before anything is sent.
-- Routing is judged by a language model and can vary between runs. A pass is a spot check, not a guarantee. If a Case fails, [tune the Routing prompts](routing-prompts.md#change-a-prompt) and verify again.
+
+Routing is judged by a language model and can vary between runs. A pass is a spot check, not a guarantee. If a Case fails, run `verify` once more, then [tune the Routing prompts](routing-prompts.md#change-a-prompt) and verify again.
 
 ### `memories`
 
@@ -139,13 +141,13 @@ A Kit never contains tests, administrator code or anyone else's key. **A Kit is 
 
 ### `webhook set --url <address> [--test]`
 
-Approval Example only.
+Used in the Approval Example.
 
 - Registers one webhook endpoint on every Leader Chain, subscribed only to routed-fact events.
 - Records each signing secret in the state. The server shows a secret once, and it is never printed here.
 - Running it again updates the address and keeps the secret.
 
-About the address:
+Address rules:
 
 - The server requires an HTTPS address without credentials and refuses a literal private IP address such as `127.0.0.1`. It resolves host names only when it delivers. The program leaves the judgment to the server and explains a rejection.
 - With no public address yet, register the placeholder `https://receiver.invalid/`: it is accepted and can never deliver. That is enough for `verify` and `simulate`. Do not combine it with `--test`.

@@ -5,7 +5,7 @@ import test from 'node:test';
 import { REPO_ROOT, withHarness } from './testing/harness.support.mjs';
 
 const read = (relative) => fs.readFileSync(path.join(REPO_ROOT, relative), 'utf8');
-const GUIDES = ['administrator-guide', 'participant-guide', 'concepts', 'known-gaps', 'troubleshooting'];
+const GUIDES = ['administrator-guide', 'participant-guide', 'routing-prompts', 'concepts', 'known-gaps', 'troubleshooting'];
 
 test('every guide in the documentation set exists and says something', () => {
   for (const guide of GUIDES) {

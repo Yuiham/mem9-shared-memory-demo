@@ -25,7 +25,7 @@ All of these are owner-only files and are ignored by git.
 
 ## The cast
 
-By default the demo has two Leaders (`lucia`, `marco`) and four Developers (`ana`, `bruno`, `carla`, `diego`), listed in `config/cast.json`. To use another cast pass a file of the same shape to `init`:
+By default the demo has two Leaders (`lucia`, `marco`) and four Developers (`ana`, `bruno`, `carla`, `diego`), listed in `config/cast.json`. To use another cast, either edit `config/cast.json` or pass a file of the same shape to `init`. The file is not remembered, so pass it on every `init`; a plain `init` reads `config/cast.json` again.
 
 ```
 ./bin/sharedmem-admin init --cast my-cast.json
@@ -58,7 +58,7 @@ Sends every Case (a sample sentence with where it should land) through the real 
 - A routing step that fails on the server still lets the write succeed, so a missing copy is reported as a failure.
 - Approval Example: a Case that should become a Candidate passes when nothing reached Team Shared and the server recorded a new routed-fact delivery for the Chain. If the receiver is running and the webhook address is a real one, the matching Candidate must also arrive; it is a test Candidate, hidden from the default `candidates` listing. Without a registered webhook these Cases are skipped with a notice. `--wait <seconds>` (default 15) sets how long to wait for the delivery record and the Candidate.
 - `--cases <file>` replaces the shipped Cases, for a spot check with fresh sentences. The file has the same fields as `config/cases.json` and is validated completely before anything is sent.
-- Routing is judged by a language model and can vary between runs. A pass is a spot check, not a guarantee. If a Case fails, tune `config/routing-prompts/`, run `init` to apply the prompts, and verify again.
+- Routing is judged by a language model and can vary between runs. A pass is a spot check, not a guarantee. If a Case fails, [tune the Routing prompts](routing-prompts.md#change-a-prompt) and verify again.
 
 ### `memories`
 
@@ -126,14 +126,12 @@ Everything shipped is a plain file under `config/`:
 | File | What it is |
 | --- | --- |
 | `cast.json` | The default cast |
-| `routing-prompts/team-shared-auto.txt` | Routing prompt A: what Developers' and Leaders' Memories to send to Team Shared |
-| `routing-prompts/leadership-shared-auto.txt` | Routing prompt B: what to send to Leadership Shared |
-| `routing-prompts/team-shared-approval.txt` | Routing prompt C: what to propose for Team Shared in the Approval Example |
+| `routing-prompts/*.txt` | The three Routing prompts: what reaches Team Shared, what reaches Leadership Shared, and what is proposed to Team Shared in the Approval Example. See [Routing prompts](routing-prompts.md) |
 | `cases.json` | The 12 Cases `verify` runs and the sample sentences handed to people |
 | `seed-memories.json` | The pinned starting Memories in Team Shared and Leadership Shared |
 | `sample-questions.json` | The question each person is asked to try, with what it should find |
 
-A Routing prompt may be at most 1,200 characters; `init` checks that before sending anything. After editing a prompt run `init` to apply it. Sample sentences are assigned by role and position: a Developer in position `i` gets the Cases `T` number `(i mod 4) + 1` and `N` number `(i mod 2) + 1`; a Leader in position `j` gets the two `L` Cases starting at number `(2j mod 4) + 1` and `W` number `(j mod 2) + 1`, wrapping around for larger casts.
+After editing a Routing prompt run `init` to apply it and `verify` to check it ([how](routing-prompts.md#change-a-prompt)). Sample sentences are assigned by role and position: a Developer in position `i` gets the Cases `T` number `(i mod 4) + 1` and `N` number `(i mod 2) + 1`; a Leader in position `j` gets the two `L` Cases starting at number `(2j mod 4) + 1` and `W` number `(j mod 2) + 1`, wrapping around for larger casts.
 
 ## A typical rehearsal
 

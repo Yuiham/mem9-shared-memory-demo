@@ -10,7 +10,9 @@ This Kit connects your coding agent (Claude Code or Codex) to your own shared-me
 2. Have your coding agent installed:
    - Claude Code: needs `claude`, `bash` and `curl` on your PATH.
    - Codex: needs `codex` and `git` on your PATH.
-3. Pick a project directory to try this in. A scratch directory is fine. The demo changes only that directory and, for Codex, your user-level mem9 and Codex folders (the program lists them before it starts).
+3. Pick a project directory to try this in. A scratch directory is fine.
+   - The demo changes only that directory and, for Codex, your user-level mem9 and Codex folders.
+   - The program lists every change before it starts.
 
 All data in this demo is fictional. Do not type anything real.
 
@@ -24,7 +26,13 @@ From this folder, run:
 
 If that does not start, run `node bin/sharedmem-participant` instead.
 
-The program asks which agent you use (arrow keys and Enter) and which directory to configure, shows what it is about to do, and waits for your yes. Nothing changes before that. For no questions at all:
+The program:
+
+- asks which agent you use (arrow keys and Enter) and which directory to configure;
+- shows what it is about to do;
+- waits for your yes. Nothing changes before that.
+
+For no questions at all:
 
 ```
 ./bin/sharedmem-participant --agent claude --dir /path/to/project --yes
@@ -42,13 +50,18 @@ It never starts your agent. When it finishes it prints:
 - the directory to enter and the command to run (open a new terminal window for that);
 - your sample sentences, a sample question and what the answer should contain.
 
-Codex must be restarted after the plugin is installed. Always start your agent from the configured directory: if the plugin starts without your key it creates a new, empty space of its own instead of using your Chain.
+Two things to remember:
+
+- Codex must be restarted after the plugin is installed.
+- Always start your agent from the configured directory. If the plugin starts without your key, it creates a new, empty space of its own instead of using your Chain.
 
 ## Try it
 
 1. Start your agent in the configured directory.
 2. Say your sample sentences, one at a time, in a normal chat.
-3. Ask the sample question. Memories are saved in the background, so shared ones appear after about a minute. If the answer is missing, wait a minute and ask again.
+3. Ask the sample question.
+   - Memories are saved in the background, so shared ones appear after about a minute.
+   - If the answer is missing, wait a minute and ask again.
 
 What to expect:
 

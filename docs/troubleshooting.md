@@ -14,11 +14,19 @@ The state records the server it was created for, and every command refuses to ru
 
 ### The server did not accept a key
 
-A Chain or Space key in the state is not known to the server. The usual causes are a state file from another server, or a Chain deleted on the server. For a deleted Chain, running `init` creates it again on the same Spaces; its key changes, so run `export` again and hand out the new Kits.
+A Chain or Space key in the state is not known to the server. The usual causes:
+
+- A state file from another server.
+- A Chain deleted on the server. Running `init` creates it again on the same Spaces; its key changes, so run `export` again and hand out the new Kits.
 
 ### `Cannot reach the mem9 server`
 
-Check the address and your network first. A connection that is cut in the middle (`UND_ERR_SOCKET`, `ECONNRESET`) can also happen on a busy or distant server. Reads and deletions are retried twice on their own; a write is never repeated, because the server may have processed it, so the command stops and you run it again. `verify` removes the test Memories of every Case it started, including the one that was being written when the connection was cut. A server that is slow (a few seconds per call is normal on a remote server; `verify` takes about five minutes for twelve Cases) is not an error.
+Check the address and your network first. Then:
+
+- A connection cut in the middle (`UND_ERR_SOCKET`, `ECONNRESET`) can also happen on a busy or distant server.
+- Reads and deletions are retried twice on their own. A write is never repeated, because the server may have processed it: the command stops and you run it again.
+- `verify` removes the test Memories of every Case it started, including the one being written when the connection was cut.
+- A slow server is not an error. A few seconds per call is normal on a remote server, and `verify` takes about five minutes for twelve Cases.
 
 ### I lost the state file
 
@@ -41,7 +49,10 @@ A `state` or `candidates` file that is not valid JSON is reported with the same 
 
 ### A rejected webhook address
 
-`webhook set` prints the server's reason. The server requires an HTTPS address without credentials, and refuses a literal private IP address such as `127.0.0.1` or `192.168.x.x`, so a receiver on your own computer needs a tunnel that gives it a public HTTPS address. Until you have one, register `https://receiver.invalid/`: it is accepted and can never deliver, which is enough for `verify` and `simulate`.
+`webhook set` prints the server's reason.
+
+- The server requires an HTTPS address without credentials, and refuses a literal private IP address such as `127.0.0.1` or `192.168.x.x`. A receiver on your own computer therefore needs a tunnel that gives it a public HTTPS address.
+- Until you have one, register `https://receiver.invalid/`: it is accepted and can never deliver, which is enough for `verify` and `simulate`.
 
 ### The receiver does not receive anything
 
@@ -50,7 +61,10 @@ Start with `webhook deliveries`: it shows whether the server tried and the last 
 1. Is it running, in the same working directory? `state/receiver.json` exists while it runs.
 2. Is the tunnel forwarding to the port the receiver printed?
 3. Is the registered address the tunnel's public HTTPS address, and not the placeholder? Run `webhook set --url <address> --test` and watch the receiver's terminal for a test event.
-4. A refusal line in the receiver's terminal names the reason: a signature mismatch (the state does not hold the secret of the endpoint the server uses; run `webhook set` again in this working directory), a stale timestamp (this computer's clock is more than five minutes off), or an unknown Chain (the state belongs to another working directory).
+4. A refusal line in the receiver's terminal names the reason:
+   - a signature mismatch: the state does not hold the secret of the endpoint the server uses, so run `webhook set` again in this working directory;
+   - a stale timestamp: this computer's clock is more than five minutes off;
+   - an unknown Chain: the state belongs to another working directory.
 5. The server's delivery attempts are retried for about two days, so a receiver that comes back may still get the announcement.
 
 ### `simulate` says the receiver is not running
@@ -71,7 +85,10 @@ Pass `--port <number>`, or `--port 0` for any free port. The receiver prints the
 
 ### The agent answers without any shared knowledge
 
-- **A Claude Code session that started outside the configured directory.** The key is a project-local setting, so it reaches the plugin only when Claude Code starts in that project. Started elsewhere, the plugin has no key and provisions a new, empty Space of its own. Close the session, `cd` to the directory the program printed, and start `claude` there.
+- **A Claude Code session that started outside the configured directory.**
+  - The key is a project-local setting, so it reaches the plugin only when Claude Code starts in that project.
+  - Started elsewhere, the plugin has no key and provisions a new, empty Space of its own.
+  - Close the session, `cd` to the directory the program printed, and start `claude` there.
 - Wait a minute after saying the sample sentences: plugin writes are asynchronous.
 - Codex: restart it after the plugin was installed, and start it from the configured project directory.
 

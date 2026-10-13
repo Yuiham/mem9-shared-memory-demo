@@ -185,7 +185,12 @@ Do this when `verify` keeps failing, or when you want the team to behave differe
 
 ## The Approval Example
 
-The default is the **Basic** Example. The **Approval** Example changes one thing: a leader's team-wide announcement is not published to Team Shared. It becomes a **Candidate** that the Administrator approves first. This shows how a mem9 server can hold a fact back for a person to decide.
+The two Examples differ in what happens to a leader's team-wide announcement:
+
+- **Basic** (the default): it stays in the leader's Personal space.
+- **Approval**: it is not published to Team Shared. It becomes a **Candidate** that the Administrator approves first. This shows how a mem9 server can hold a fact back for a person to decide.
+
+Switching:
 
 - You can switch between the two without changing any key.
 - Kits already handed out keep working. Run `export` again to refresh the Example named inside them.
@@ -216,7 +221,7 @@ Only Cases whose ids are a letter and a number (`T1`, `L1`, `W1`, `N1` and so on
 
 ## Documentation
 
-- [Administrator guide](docs/administrator-guide.md): every command, the working directory, the cast, cleaning up.
+- [Administrator guide](docs/administrator-guide.md): a typical rehearsal, the working directory, the cast, every command, cleaning up.
 - [Participant guide](docs/participant-guide.md): what a Participant does with a Kit. Each Kit includes it as its `README.md`.
 - [Routing prompts](docs/routing-prompts.md): which prompt does what, how to change one, how `verify` checks it.
 - [Concepts](docs/concepts.md): Spaces, Chains, keys, Node modes, Examples.

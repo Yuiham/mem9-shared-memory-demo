@@ -50,20 +50,26 @@ What the demo does not do, or cannot guarantee. Read this before showing it to a
 18. **Installing the Codex plugin changes the person's user-level Codex hook files** and stores the Chain's key in a user-level credentials file (`$MEM9_HOME/.credentials.json`, default `~/.mem9/`).
     - The plugin creates that file readable by other users of the computer, so the Participant program restricts it to its owner.
     - Only the project override (the project settings) is project-local.
-19. **The Claude Code settings file holds the Chain key.**
+19. **Codex runs the plugin's hooks only after the person trusts them, and the program cannot do that for the person.**
+    - The first time Codex starts in the project it asks `Trust this folder?` and `Hooks need review`. A hook that was not trusted is skipped without any error, so the agent answers with no shared knowledge. `codex exec` skips it silently too.
+    - Codex records the trust itself, in `~/.codex/config.toml` (one `[hooks.state]` entry per hook, with a hash of its definition). The only way around it is the flag `--dangerously-bypass-hook-trust`, which applies to one run, and the program does not use it.
+    - The program prints the two answers to give, and the Participant guide explains how to trust later with `/hooks`. The plugin's own README does not mention this step.
+    - Checked with Codex 0.162.1. Other versions may word the questions differently.
+20. **The Claude Code settings file holds the Chain key.**
     - `.claude/settings.local.json` in the project is made owner-only, but the program does not touch the project's `.gitignore`.
     - Check that the file is ignored before committing a project that was set up.
-20. **The automated tests do not cover real agent sessions or real HTTPS deliveries.**
+21. **The automated tests do not cover real agent sessions or real HTTPS deliveries.**
     - Installing and configuring the real Claude Code and Codex plugins was checked by hand in a disposable Linux environment, not by the test suite.
-    - The key reaching a running agent session (for Claude Code through the settings environment) and a delivery through a public tunnel are for you to try with the Try it steps.
-    - The terminal paths (pressing arrow keys, answering a prompt) are not tested either.
+    - A real Codex session (0.162.1, against a fake server) was checked the same way. Before the hooks were trusted, nothing reached the server and the agent had no shared knowledge. After they were trusted, the plugin recalled a seeded Memory for the prompt and saved the conversation. No real Claude Code session was run.
+    - The key reaching a running Claude Code session (through the settings environment) and a delivery through a public tunnel are for you to try with the Try it steps.
+    - The terminal paths (pressing arrow keys, answering a prompt) are not tested by the suite either.
 
 ## Server and local state
 
-21. **The server cannot list or delete Spaces.**
+22. **The server cannot list or delete Spaces.**
     - The local state is the only record, and Spaces remain after `teardown`.
     - Losing the state means the next `init` creates new Spaces and Chains, and the old ones stay on the server unused.
-22. **A change may take a few minutes to show on the server.**
+23. **A change may take a few minutes to show on the server.**
     - In one run, right after switching to the Approval Example and registering a webhook, `verify` found no routed-fact delivery for the two announcement Cases for about three minutes. About six minutes after the switch both passed. The cause was not established.
     - If `verify` fails right after `init` or `webhook set`, wait a few minutes and run it again before changing a prompt.
-23. **The demo does not change the server or the plugins**, and it does not support Windows, graphical interfaces or languages other than English in its documentation.
+24. **The demo does not change the server or the plugins**, and it does not support Windows, graphical interfaces or languages other than English in its documentation.

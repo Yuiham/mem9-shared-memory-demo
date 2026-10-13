@@ -52,8 +52,21 @@ It never starts your agent. When it finishes it prints:
 
 Before you start the agent:
 
-- Codex must be restarted after the plugin is installed.
+- Codex must be restarted after the plugin is installed. The first time it starts, it asks two questions (see the next section).
 - Always start your agent from the configured directory. If the plugin starts without your key, it creates a new, empty space of its own instead of using your Chain.
+
+## The first time you start Codex
+
+Codex asks two questions before the plugin can work:
+
+1. `Trust this folder?` Choose `Trust and continue`.
+2. `Hooks need review`, which says that 3 hooks are new or changed. Choose `Trust all and continue`.
+
+The plugin saves and recalls Memories through Codex hooks, and Codex runs a hook only after you trust it. A hook you did not trust is skipped without any error, so Codex answers with no shared knowledge.
+
+- If you continued without trusting the hooks, type `/hooks` in Codex and press `t` to trust all.
+- Codex keeps your answer in its own settings (`~/.codex/config.toml`), so you answer once. Running this program again leaves the hooks unchanged, so Codex does not ask again. If a hook's definition changes, Codex asks again.
+- These are the words of Codex 0.162.1. Another version may word them differently.
 
 ## Try it
 
@@ -82,5 +95,6 @@ The program is safe to run again: it repeats the same steps, keeps your other se
 - `claude was not found` or `codex was not found`: install the agent, then run the program again.
 - `... is not valid JSON` for `.claude/settings.local.json`: the program refuses to overwrite a file it cannot read. Fix or move the file, then run it again.
 - The agent answers without any shared knowledge: check that you started it from the configured directory, wait a minute after saying the sentences, and ask again.
+- Codex answers without any shared knowledge: type `/hooks`. If it says that hooks need review, press `t` to trust them all, then ask again.
 
 If it still does not work, send the Administrator the text the program printed. It masks your key and the server address.

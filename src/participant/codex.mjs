@@ -119,6 +119,18 @@ export async function configure({ io, env, person, dir, context }) {
   return { supportsAgentId, credentialsRestricted };
 }
 
+// Observed with the real Codex 0.162.1 and the real plugin: the plugin works through
+// user-level hooks, and Codex runs a hook only after the person has trusted it. Until
+// then it skips the hooks without an error, so the agent answers with no shared
+// knowledge. Codex records the trust itself; the words below are the ones it shows.
+const FIRST_START = [
+  'Answer the two questions Codex asks the first time it starts here:',
+  '  "Trust this folder?"  choose "Trust and continue"',
+  '  "Hooks need review"   choose "Trust all and continue"',
+  'The plugin works through hooks, and Codex runs a hook only after you trust it. Without this step Codex answers with no shared knowledge and shows no error.',
+  'If you chose another option, type /hooks in Codex and press t to trust all.',
+];
+
 export function nextSteps({ dir, result }) {
   const credentials = result?.credentialsRestricted
     ? 'this program makes that file owner-only'
@@ -130,5 +142,5 @@ export function nextSteps({ dir, result }) {
   if (!result?.supportsAgentId) {
     notes.push('The installed Codex plugin cannot set an Agent ID yet, so that step was skipped: your Codex writes under the shared Agent ID "codex", and near-duplicate facts from different people can merge. Update the plugin and run this program again once it supports Agent IDs.');
   }
-  return { command: 'codex', notes };
+  return { command: 'codex', afterStart: FIRST_START, notes };
 }

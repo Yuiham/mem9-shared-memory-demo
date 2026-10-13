@@ -59,6 +59,20 @@ test('the Participant guide stands alone inside a Kit: it links to no other file
   }
 });
 
+// Codex skips a plugin hook until the person trusts it, and says nothing in the chat
+// (observed with the real Codex 0.162.1), so every place a person looks must say so.
+test('the documents that a person with a silent Codex reads explain the hook review', () => {
+  const guide = read('docs/participant-guide.md');
+  assert.match(guide, /^## The first time you start Codex$/m);
+  for (const phrase of ['Trust and continue', 'Hooks need review', 'Trust all and continue', '`/hooks`']) {
+    assert.ok(guide.includes(phrase), `the Participant guide names ${phrase}`);
+  }
+  const troubleshooting = read('docs/troubleshooting.md');
+  assert.match(troubleshooting, /Hooks need review/, 'troubleshooting names the question');
+  assert.match(troubleshooting, /`\/hooks`/, 'troubleshooting names the way to trust later');
+  assert.match(read('docs/known-gaps.md'), /Hooks need review/, 'the known gaps record the limit');
+});
+
 test('the documentation is written for people: no unfinished markers', () => {
   for (const document of ['README.md', ...GUIDES.map((guide) => `docs/${guide}.md`)]) {
     assert.doesNotMatch(read(document), /\b(TODO|FIXME|TBD|XXX)\b/, document);

@@ -13,7 +13,9 @@ function expectation(person) {
   return lines.join(' ');
 }
 
-export function printGuidance(io, { person, agentLabel, dir, command, notes }) {
+// `afterStart` holds what the person must do once the agent is running, as lines: the
+// first one is the text of step 4 and the others continue it.
+export function printGuidance(io, { person, agentLabel, dir, command, notes, afterStart = [] }) {
   io.out('');
   io.out(`Done: ${agentLabel} is set up for ${person.name} (${ROLE_LABEL[person.role]}) in ${dir}.`);
   io.out('');
@@ -22,6 +24,10 @@ export function printGuidance(io, { person, agentLabel, dir, command, notes }) {
   io.out(`  2. cd ${dir}`);
   io.out(`  3. Start ${agentLabel}:`);
   io.out(`       ${command}`);
+  if (afterStart.length > 0) {
+    io.out(`  4. ${afterStart[0]}`);
+    for (const line of afterStart.slice(1)) io.out(`     ${line}`);
+  }
   io.out('');
   io.out('Try it');
   io.out('  Say these to your agent, one at a time:');

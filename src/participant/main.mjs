@@ -94,8 +94,8 @@ export async function main(argv, { stdout, stderr, stdin, env = process.env } = 
       return 1;
     }
     const result = await recipe.configure({ io, env, person, dir, context });
-    const { command, notes } = recipe.nextSteps({ dir, result });
-    printGuidance(io, { person, agentLabel: recipe.label, dir, command, notes });
+    const { command, notes, afterStart } = recipe.nextSteps({ dir, result });
+    printGuidance(io, { person, agentLabel: recipe.label, dir, command, notes, afterStart });
     return 0;
   } catch (error) {
     return reportError(io, error);

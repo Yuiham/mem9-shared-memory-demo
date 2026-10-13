@@ -143,6 +143,8 @@ It never starts the agent.
 
 Codex also needs changes outside the project: the plugin's user-level credentials file, which holds the key, and the user's Codex hook files. The program may also run `git init` in the project. The plan lists every change before it asks.
 
+The first time Codex starts in the project, it asks the person to trust the folder and to review the plugin's hooks. The hooks do nothing until they are trusted, so the program prints the answers to give.
+
 ### 5. Use the agent (Participant)
 
 Try it as a normal user:

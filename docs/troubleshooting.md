@@ -90,6 +90,10 @@ Pass `--port <number>`, or `--port 0` for any free port. The receiver prints the
   - Started elsewhere, the plugin has no key and provisions a new, empty Space of its own.
   - Close the session, `cd` to the directory the program printed, and start `claude` there.
 - **The Memories are not there yet.** Wait a minute after saying the sample sentences: plugin writes are asynchronous.
+- **Codex skipped the plugin's hooks because they are not trusted.**
+  - Codex runs a hook only after you trust it. It skips an untrusted hook without any error, so the agent answers with no shared knowledge. A session started with `codex exec` skips it silently too.
+  - The first time Codex starts, it asks `Hooks need review`. Choosing `Continue without trusting` leaves the hooks off.
+  - Type `/hooks` in Codex. If it says that hooks need review, press `t` to trust them all, then ask again. If the answer is still missing, start a new Codex session.
 - **Codex needs a restart.** Restart it after the plugin was installed, and start it from the configured project directory.
 
 ### `claude was not found`, `codex was not found`, `git was not found`, `bash`, `curl`

@@ -188,6 +188,31 @@ test('Codex: installs the plugin, saves the profile through the setup script and
   assert.ok(commandsOf(h, 'codex').every((line) => line.startsWith('codex plugin ')), 'Codex itself is never started');
 });
 
+// Found by running the real Codex 0.162.1 with the real plugin: the plugin works through
+// user-level hooks, and Codex runs a hook only after the person trusts it. Until then it
+// skips the hooks without an error, so the agent answers with no shared knowledge.
+test('Codex: the guidance and the Kit README tell the person how to trust the folder and the hooks, in the words Codex uses', async (t) => {
+  const { h, kit, project, run } = await setup(t);
+  gitInit(h, project);
+  const result = await run(['--agent', 'codex', '--dir', project, '--yes']);
+  assert.equal(result.code, 0, result.output);
+  const readme = fs.readFileSync(path.join(kit.dir, 'README.md'), 'utf8');
+  for (const phrase of ['Trust this folder?', 'Trust and continue', 'Hooks need review', 'Trust all and continue', '/hooks']) {
+    assert.ok(result.stdout.includes(phrase), `the output names "${phrase}"`);
+    assert.ok(readme.includes(phrase), `the README of the Kit names "${phrase}"`);
+  }
+  assert.match(result.stdout, /no shared knowledge/, 'the output says what happens without the step');
+  const steps = result.stdout.split('Next steps')[1].split('Try it')[0];
+  assert.match(steps, /3\. Start Codex:\s+codex\s+4\. Answer the two questions/, 'the questions come right after starting Codex');
+});
+
+test('the first-start step of Codex is printed for Codex only', async (t) => {
+  const { project, run } = await setup(t);
+  const result = await run(['--agent', 'claude', '--dir', project, '--yes']);
+  assert.equal(result.code, 0, result.output);
+  assert.doesNotMatch(result.stdout, /Hooks need review|\/hooks|4\. /);
+});
+
 // Found by installing the real plugin: its setup script creates the credentials file with
 // the default mode, so the Chain key would be readable by other users of the computer.
 test('Codex: the credentials file that holds the key is made owner-only', async (t) => {

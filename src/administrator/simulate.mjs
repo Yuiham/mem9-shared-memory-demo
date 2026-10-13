@@ -3,6 +3,7 @@
 // exactly as it checks a real delivery.
 import crypto from 'node:crypto';
 import { CliError, parseOptions, renderHelp, UsageError } from '../shared/cli.mjs';
+import { PLACEHOLDER_URL, ROUTED_EVENT } from '../shared/names.mjs';
 import { COMMON_OPTIONS, openContext } from './context.mjs';
 import { TEAM } from './layout.mjs';
 import { processIsAlive, readRuntime } from './receiver-runtime.mjs';
@@ -48,7 +49,7 @@ export async function run(argv, { io, env, program }) {
   const webhook = state.webhooks?.[leader.name];
   if (!webhook) {
     throw new CliError(`${leader.name} has no registered webhook endpoint, so there is no signing secret to sign with.`, {
-      next: 'Run `sharedmem-admin webhook set --url https://receiver.invalid/` (a placeholder is enough), then try again.',
+      next: 'Run `sharedmem-admin webhook set --url ${PLACEHOLDER_URL}` (a placeholder is enough), then try again.',
     });
   }
   const runtime = readRuntime(workdir);
@@ -60,7 +61,7 @@ export async function run(argv, { io, env, program }) {
   const eventId = `evt_${crypto.randomBytes(10).toString('hex')}`;
   const envelope = {
     id: eventId,
-    type: 'space_chain.fact_routed',
+    type: ROUTED_EVENT,
     api_version: 'v1',
     created_at: new Date().toISOString(),
     scope: { type: 'chain', chain_id: chain.id },

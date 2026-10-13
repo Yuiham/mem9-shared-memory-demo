@@ -1,8 +1,9 @@
 // The cast: who takes part and in which role.
 import fs from 'node:fs';
 import { CliError } from './cli.mjs';
+import { SEED_AGENT_ID, VERIFY_PREFIX } from './names.mjs';
 
-export const RESERVED_NAMES = ['seed', 'team-shared', 'leadership-shared'];
+export const RESERVED_NAMES = [SEED_AGENT_ID, 'team-shared', 'leadership-shared'];
 export const ROLES = ['leader', 'developer'];
 export const NAME_LIMIT = 100;
 
@@ -22,7 +23,7 @@ export function validateCast(cast) {
     }
     if (!/^[a-z0-9-]+$/.test(name)) problems.push(`Name "${name}" may only use lowercase letters, digits and hyphens.`);
     if (name.length > NAME_LIMIT) problems.push(`Name "${name.slice(0, 20)}..." is longer than ${NAME_LIMIT} characters.`);
-    if (RESERVED_NAMES.includes(name) || name.startsWith('verify-')) {
+    if (RESERVED_NAMES.includes(name) || name.startsWith(VERIFY_PREFIX)) {
       problems.push(`Name "${name}" is reserved for the demo's own identifiers.`);
     }
     if (seen.has(name)) problems.push(`Name "${name}" appears more than once.`);

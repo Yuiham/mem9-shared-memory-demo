@@ -2,10 +2,11 @@
 // the Approval Example holds back reach the local receiver.
 import { CliError, parseOptions, renderHelp, UsageError } from '../shared/cli.mjs';
 import { ApiError } from '../shared/http.mjs';
+import { isPlaceholderUrl, PLACEHOLDER_URL, ROUTED_EVENT } from '../shared/names.mjs';
 import { COMMON_OPTIONS, openContext } from './context.mjs';
 
-const EVENTS = ['space_chain.fact_routed'];
-const PLACEHOLDER_EXAMPLE = 'https://receiver.invalid/';
+const EVENTS = [ROUTED_EVENT];
+const PLACEHOLDER_EXAMPLE = PLACEHOLDER_URL;
 
 const OPTIONS = [
   { name: 'url', type: 'string', placeholder: 'public URL', description: 'The public HTTPS address the server should deliver to (set).' },
@@ -77,7 +78,7 @@ async function set(values, { io, env, program }) {
     throw new UsageError('--url is required.', { next: `Pass the public address of your receiver, or the placeholder ${PLACEHOLDER_EXAMPLE}.` });
   }
   const parsed = parseTarget(values.url);
-  const placeholder = parsed.hostname.endsWith('.invalid');
+  const placeholder = isPlaceholderUrl(parsed.href);
   if (placeholder && values.test) {
     throw new UsageError('A placeholder address can never deliver, so --test would only fail.', { next: 'Run again without --test, or give the address of a tunnel.' });
   }

@@ -4,6 +4,7 @@
 // only; a tunnel provides the public address.
 import http from 'node:http';
 import { CliError, parseOptions, renderHelp, UsageError } from '../shared/cli.mjs';
+import { ROUTED_EVENT, VERIFY_PREFIX } from '../shared/names.mjs';
 import { CandidateStore } from './candidate-store.mjs';
 import { COMMON_OPTIONS, openContext } from './context.mjs';
 import { processIsAlive, readRuntime, removeRuntime, writeRuntime } from './receiver-runtime.mjs';
@@ -66,7 +67,7 @@ function judge({ headers, raw, store, candidates }) {
   if (candidates.hasHandled(eventId)) return { status: 200, outcome: 'duplicate' };
 
   const data = envelope.data ?? {};
-  const heldBack = envelope.type === 'space_chain.fact_routed' && data.webhook_only === true;
+  const heldBack = envelope.type === ROUTED_EVENT && data.webhook_only === true;
   if (!heldBack) {
     candidates.recordDelivery({ eventId, candidates: [] });
     return { status: 200, outcome: envelope.type === 'webhook.test' ? 'test event' : 'ignored' };
@@ -82,7 +83,7 @@ function judge({ headers, raw, store, candidates }) {
       sessionId: typeof data.session_id === 'string' ? data.session_id : '',
       eventId,
       routeId: typeof data.route_id === 'string' ? data.route_id : '',
-      test: agentId.startsWith('verify-'),
+      test: agentId.startsWith(VERIFY_PREFIX),
       simulated: headers[SIMULATED_HEADER] === '1',
       receivedAt: new Date().toISOString(),
     })),

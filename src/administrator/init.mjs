@@ -5,6 +5,7 @@ import path from 'node:path';
 import { CliError, parseOptions, renderHelp, UsageError } from '../shared/cli.mjs';
 import { confirm } from '../shared/prompt.mjs';
 import { ApiError } from '../shared/http.mjs';
+import { SEED_AGENT_ID } from '../shared/names.mjs';
 import { COMMON_OPTIONS, openContext } from './context.mjs';
 import { loadDemoCast, loadPrompts, loadSeeds } from './content.mjs';
 import { chainNameFor, displayName, EXAMPLES, nodeLayout, policyMatches, SHARED_SPACES } from './layout.mjs';
@@ -139,9 +140,9 @@ async function writeSeeds({ ctx, seeds }) {
   let written = 0;
   for (const seed of seeds) {
     const key = store.state.spaces[seed.space].key;
-    if (!existing.has(seed.space)) existing.set(seed.space, await mem9.listMemories(key, { memory_type: 'pinned', agent_id: 'seed' }));
+    if (!existing.has(seed.space)) existing.set(seed.space, await mem9.listMemories(key, { memory_type: 'pinned', agent_id: SEED_AGENT_ID }));
     if (existing.get(seed.space).some((memory) => memory.content === seed.text)) continue;
-    await mem9.writePinned(key, { text: seed.text, agentId: 'seed', tags: ['seed'] });
+    await mem9.writePinned(key, { text: seed.text, agentId: SEED_AGENT_ID, tags: ['seed'] });
     written += 1;
   }
   io.out(`  seed memories: ${written} written, ${seeds.length - written} already present`);

@@ -3,6 +3,7 @@
 import crypto from 'node:crypto';
 import { CliError, parseOptions, renderHelp, UsageError } from '../shared/cli.mjs';
 import { ApiError } from '../shared/http.mjs';
+import { isPlaceholderUrl, ROUTED_EVENT, VERIFY_PREFIX } from '../shared/names.mjs';
 import { CandidateStore } from './candidate-store.mjs';
 import { COMMON_OPTIONS, openContext } from './context.mjs';
 import { processIsAlive, readRuntime } from './receiver-runtime.mjs';
@@ -10,7 +11,6 @@ import { expectedSpaces, expectsCandidate, loadCases } from './cases.mjs';
 import { displayName, LEADERSHIP, TEAM } from './layout.mjs';
 
 const DEFAULT_WAIT_SECONDS = 15;
-const ROUTED_EVENT = 'space_chain.fact_routed';
 const POLL_MS = 250;
 
 const OPTIONS = [
@@ -84,13 +84,7 @@ async function waitUntil(check, waitMs) {
 const deliveryIds = async (mem9, chain) => new Set((await mem9.webhookDeliveries(chain, 200)).map((record) => record.id));
 
 // The webhook address of a placeholder can never deliver, so no Candidate can arrive.
-const isPlaceholder = (webhook) => {
-  try {
-    return new URL(webhook.url).hostname.endsWith('.invalid');
-  } catch {
-    return false;
-  }
-};
+const isPlaceholder = (webhook) => isPlaceholderUrl(webhook.url);
 
 // The Approval path of a Case that should become a Candidate: the server recorded a new
 // routed-fact delivery for the Chain and, when a receiver can be reached, the Candidate
@@ -118,10 +112,10 @@ async function checkApprovalPath({ ctx, speaker, agentId, seen, waitMs }) {
   return { ok: true, note: 'delivery recorded and the Candidate arrived at the receiver (marked as a test Candidate).' };
 }
 
-async function runCase({ ctx, testCase, example, run, waitMs, written }) {
+async function runCase({ ctx, testCase, example, runId, waitMs, written }) {
   const { store, mem9 } = ctx;
   const speaker = pickSpeaker(store.state, testCase.role);
-  const agentId = `verify-${run}-${testCase.id}`;
+  const agentId = `${VERIFY_PREFIX}${runId}-${testCase.id}`;
   const expected = expectedSpaces(testCase, example);
   const result = { id: testCase.id, speaker: speaker.name, expected, actual: [], status: 'fail', note: '', agentId, speakerEntry: speaker };
   const wantsCandidate = expectsCandidate(testCase, example);
@@ -190,7 +184,7 @@ export async function run(argv, { io, env, program }) {
         results.push({ id: testCase.id, speaker: pickSpeaker(state, testCase.role).name, expected: expectedSpaces(testCase, example), actual: [], status: 'skip', note: 'needs a webhook' });
         continue;
       }
-      results.push(await runCase({ ctx, testCase, example, run: runId, waitMs: waitSeconds * 1000, written }));
+      results.push(await runCase({ ctx, testCase, example, runId, waitMs: waitSeconds * 1000, written }));
     }
   } finally {
     // Tidy up even when the run stops early; the sweep only reads and deletes what this run wrote.

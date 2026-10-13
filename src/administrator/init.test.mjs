@@ -297,3 +297,79 @@ test('init --help says what it changes, and an unknown option is a usage error',
   assert.equal(unknown.code, 2);
   assert.match(unknown.stderr, /Unknown option: --bogus/);
 });
+
+// ---- found by reviewing the finished work ----------------------------------------
+
+test('a changed Routing prompt is applied to the Chains that use it, and nothing else is rewritten', async (t) => {
+  const h = await withHarness(t);
+  const copy = h.copyProgram();
+  const first = await h.admin(['init', '--yes'], { launcher: copy.launcher });
+  assert.equal(first.code, 0, first.output);
+  const nodePuts = h.count('PUT', /\/nodes$/);
+  const policyPuts = h.count('PUT', /routing-policy$/);
+  fs.writeFileSync(path.join(copy.dir, 'config', 'routing-prompts', 'team-shared-auto.txt'), 'A new prompt for Team Shared.\n');
+  const second = await h.admin(['init', '--yes'], { launcher: copy.launcher });
+  assert.equal(second.code, 0, second.output);
+  assert.equal(h.count('PUT', /\/nodes$/), nodePuts, 'no node was replaced');
+  assert.equal(h.count('PUT', /routing-policy$/), policyPuts + 4, 'the four Developers use the Team Shared prompt');
+  for (const name of ['ana', 'bruno', 'carla', 'diego']) assert.equal(nodesOf(h.fake, name)[1].routing_policy_prompt, 'A new prompt for Team Shared.', name);
+  assert.equal(nodesOf(h.fake, 'lucia')[1].routing_policy_prompt, readPrompt('leadership-shared-auto'), 'the Leaders\' prompt is untouched');
+  assert.match(second.stdout, /ana: nodes unchanged, 1 routing policy updated/);
+});
+
+test('nodes that drifted on the server are set again together with their policies, and the state follows the new node ids', async (t) => {
+  const { h } = await initialized(t);
+  const before = h.readState();
+  nodesOf(h.fake, 'ana')[1].display_name = 'Renamed';
+  const nodePuts = h.count('PUT', /\/nodes$/);
+  const second = await h.admin(['init', '--yes']);
+  assert.equal(second.code, 0, second.output);
+  assert.equal(h.count('PUT', /\/nodes$/), nodePuts + 1, 'only the drifted Chain');
+  assert.equal(nodesOf(h.fake, 'ana')[1].display_name, 'Team Shared');
+  assert.deepEqual(policyOf(nodesOf(h.fake, 'ana')[1]), { enabled: true, webhookOnly: false, prompt: readPrompt('team-shared-auto') });
+  const after = h.readState();
+  assert.equal(after.chains.ana.nodes[1].id, nodesOf(h.fake, 'ana')[1].id);
+  assert.notEqual(after.chains.ana.nodes[1].id, before.chains.ana.nodes[1].id);
+  assert.equal(after.chains.ana.key, before.chains.ana.key);
+});
+
+test('a Routing prompt of exactly the server limit is accepted', async (t) => {
+  const h = await withHarness(t);
+  const copy = h.copyProgram();
+  fs.writeFileSync(path.join(copy.dir, 'config', 'routing-prompts', 'team-shared-auto.txt'), 'x'.repeat(1200));
+  const result = await h.admin(['init', '--yes'], { launcher: copy.launcher });
+  assert.equal(result.code, 0, result.output);
+  assert.equal(nodesOf(h.fake, 'ana')[1].routing_policy_prompt.length, 1200);
+});
+
+test('a participant name of exactly 100 characters is accepted', async (t) => {
+  const h = await withHarness(t);
+  const longest = 'a'.repeat(100);
+  const cast = h.writeCast([{ name: 'lucia', role: 'leader' }, { name: longest, role: 'developer' }]);
+  const result = await h.admin(['init', '--cast', cast, '--yes']);
+  assert.equal(result.code, 0, result.output);
+  assert.ok(h.readState().chains[longest]);
+});
+
+test('a state file that is not valid JSON is refused by every command and left untouched', async (t) => {
+  const { h } = await initialized(t);
+  const file = path.join(h.workdir, 'state', 'state.json');
+  fs.writeFileSync(file, '{ broken');
+  for (const args of [['init', '--yes'], ['memories'], ['export'], ['verify'], ['teardown', '--yes']]) {
+    const result = await h.admin(args);
+    assert.equal(result.code, 1, args[0]);
+    assert.match(result.stderr, /not valid JSON/, args[0]);
+    assert.match(result.stderr, /\.bak/, `${args[0]} names the backup`);
+  }
+  assert.equal(fs.readFileSync(file, 'utf8'), '{ broken');
+});
+
+test('a state file of the wrong version is refused with a next step', async (t) => {
+  const { h } = await initialized(t);
+  const file = path.join(h.workdir, 'state', 'state.json');
+  fs.writeFileSync(file, JSON.stringify({ ...h.readState(), version: 99 }));
+  const result = await h.admin(['init', '--yes']);
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /version 99/);
+  assert.match(result.stderr, /next:/);
+});

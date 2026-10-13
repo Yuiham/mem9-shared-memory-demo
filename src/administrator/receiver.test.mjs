@@ -141,6 +141,9 @@ test('a body that is too large is refused', async (t) => {
   const outcome = await post(demo.url, delivery).catch((error) => ({ error }));
   assert.ok(outcome.error || outcome.status === 413, 'refused or the connection was closed');
   assert.equal(demo.candidates().candidates.length, 0);
+  const next = await post(demo.url, buildDelivery(demo.h, 'lucia'));
+  assert.equal(next.status, 200, 'the receiver still serves after refusing a body');
+  assert.equal(demo.candidates().candidates.length, 1);
 });
 
 test('a duplicate delivery is acknowledged and creates nothing more', async (t) => {

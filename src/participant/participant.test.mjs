@@ -184,9 +184,8 @@ test('Codex: without Agent ID support in the setup command, that step is skipped
   assert.equal(result.code, 0, result.output);
   assert.ok(setupLog(h).some((line) => /^setup scope apply --scope project --profile sharedmem-ana$/.test(line)), 'no --agent-id is passed');
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(project, '.codex', 'mem9', 'config.json'), 'utf8')), { schemaVersion: 1, profileId: 'sharedmem-ana' });
-  assert.match(result.stdout, /Agent ID/);
-  assert.match(result.stdout, /codex/);
-  assert.match(result.stdout, /shared/i);
+  assert.match(result.stdout, /cannot set an Agent ID yet/);
+  assert.match(result.stdout, /shared Agent ID "codex"/);
 });
 
 test('Codex: the setup script is taken from the local directory when there is one, otherwise the last name in sorted order', async (t) => {

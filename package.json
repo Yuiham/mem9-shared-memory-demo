@@ -2,6 +2,7 @@
   "name": "shared-memory-demo",
   "version": "0.1.0",
   "private": true,
+  "license": "Apache-2.0",
   "description": "A reference setup that shows how to configure, use and test mem9 shared memory (Space Chains) for several people.",
   "engines": {
     "node": ">=22"

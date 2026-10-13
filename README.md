@@ -161,3 +161,7 @@ src/        administrator, participant, shared and testing support; tests sit be
 state/      created by the Administrator program, holds every key (git-ignored)
 out/        created by export: Kits and the report (git-ignored)
 ```
+
+## License
+
+[Apache-2.0](LICENSE), the same license as mem9.

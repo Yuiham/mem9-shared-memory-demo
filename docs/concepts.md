@@ -4,7 +4,11 @@ The ideas behind the demo, in the order you meet them.
 
 ## Space
 
-A **Space** is a place on the mem9 server where Memories are stored. Each person has a **Personal space**, and the demo adds two **Shared spaces**: **Team Shared** and **Leadership Shared**. The default cast therefore has eight Spaces: six Personal and two Shared.
+A **Space** is a place on the mem9 server where Memories are stored.
+
+- Each person has a **Personal space**.
+- The demo adds two **Shared spaces**: **Team Shared** and **Leadership Shared**.
+- The default cast therefore has eight Spaces: six Personal and two Shared.
 
 The server issues each Space a **mem9 API key** when it is created. That key reads and writes that one Space. The server cannot list or delete Spaces, so the demo's local state file is the only record of them.
 
@@ -18,7 +22,10 @@ Passing remarks, status updates and questions are never stored. Durable statemen
 
 ## Chain
 
-A **Chain** (a Space Chain) is an ordered list of Spaces seen as one. Position 0 is the **owner**: writes through the Chain land there first, and the owner's Personal space is what the person owns. The other nodes are shared Spaces that the Chain can **read** and, depending on the **Node mode**, receive routed copies of the person's facts.
+A **Chain** (a Space Chain) is an ordered list of Spaces seen as one.
+
+- Position 0 is the **owner**. Writes through the Chain land there first, and the owner's Personal space is what the person owns.
+- The other nodes are shared Spaces. The Chain can **read** them and, depending on the **Node mode**, receive routed copies of the person's facts.
 
 Every person has their own Chain, named `sharedmem-demo-<name>`:
 
@@ -38,13 +45,17 @@ A person's Kit holds only their Chain API key. The Administrator holds every key
 
 ## External space identifier
 
-Each shared node in a Chain has a fixed **external space identifier**: `team-shared` and `leadership-shared`. Routing refers to a node by that identifier, and a node without one is ignored by routing. A node also has a display name (Team Shared, Leadership Shared), which the routing model sees next to the Routing prompt.
+- Each shared node in a Chain has a fixed **external space identifier**: `team-shared` and `leadership-shared`.
+- Routing refers to a node by that identifier. A node without one is ignored by routing.
+- A node also has a display name (Team Shared, Leadership Shared), which the routing model sees next to the Routing prompt.
 
 ## Routing prompts and Node modes
 
-After a person says something, the server extracts durable facts into their Personal space and then decides, for each other node of their Chain, whether the fact belongs there. The decision is made by a language model that reads the node's **Routing prompt**, a short instruction such as "send lasting engineering knowledge the whole team should follow". It judges by meaning, in English, Spanish or Portuguese.
+After a person says something:
 
-A node's **Node mode** is stored on the server as its routing rule:
+1. The server extracts durable facts into their Personal space.
+2. For each other node of their Chain, a language model decides whether the fact belongs there. It reads the node's **Routing prompt**, a short instruction such as "send lasting engineering knowledge the whole team should follow", and judges by meaning, in English, Spanish or Portuguese.
+3. What happens next depends on the node's **Node mode**, which the server stores as its routing rule:
 
 | Node mode | Routing rule | What happens |
 | --- | --- | --- |
@@ -52,7 +63,13 @@ A node's **Node mode** is stored on the server as its routing rule:
 | Approval | enabled, with a Routing prompt, **webhook-only** | Matching facts are not copied; the server sends a webhook delivery instead |
 | Read-only | disabled | Nothing is routed into the node, but the Chain still reads it |
 
-The demo uses three Routing prompts: **A** (Team Shared, auto), **B** (Leadership Shared, auto) and **C** (Team Shared, approval). Approval is a general Node mode and could apply to any node; the demo shows it only on the Team Shared node of Leader Chains.
+The demo uses three Routing prompts:
+
+- **A**: Team Shared, auto.
+- **B**: Leadership Shared, auto.
+- **C**: Team Shared, approval.
+
+Approval is a general Node mode and could apply to any node; the demo shows it only on the Team Shared node of Leader Chains.
 
 Node modes govern routing only. A Chain API key can read, update and delete Memories in every Space of its Chain, so the real boundary is which Spaces a Chain contains (see [Known gaps](known-gaps.md)).
 
@@ -67,7 +84,11 @@ You switch Examples by running `init` again with the other `--example`. Chains a
 
 ## Candidates, webhooks and the receiver
 
-In the Approval Example the server sends a **webhook delivery** (an HTTPS call signed with a per-endpoint secret) for each held-back fact. A **receiver** (`receiver serve`) checks the signature and the timestamp, ignores duplicates, and stores each fact as a **Candidate** attributed to the Leader whose Chain produced it. The Administrator **approves** a Candidate, which writes its text word for word into Team Shared as a pinned Memory from that Leader, or **rejects** it.
+In the Approval Example, each fact the server holds back goes through three steps:
+
+1. The server sends a **webhook delivery**: an HTTPS call signed with a per-endpoint secret.
+2. A **receiver** (`receiver serve`) checks the signature and the timestamp, ignores duplicates, and stores the fact as a **Candidate**, attributed to the Leader whose Chain produced it.
+3. The Administrator **approves** the Candidate, which writes its text word for word into Team Shared as a pinned Memory from that Leader, or **rejects** it.
 
 `simulate` sends a correctly signed delivery to the local receiver, so the flow can be shown without a public address.
 

@@ -1,6 +1,10 @@
 # Routing prompts
 
-When a person says something lasting, mem9 saves the fact in their Personal space. Then, for each shared space in their Chain, a language model answers one question: does this fact belong there? The **routing prompt** of that space is the question. In this demo the prompts are three plain-text files, so changing what reaches Team Shared or Leadership Shared means editing one of them.
+How routing works in short:
+
+1. A person says something lasting, and mem9 saves the fact in their Personal space.
+2. For each shared space in their Chain, a language model answers one question: does this fact belong there? The **routing prompt** of that space is the question.
+3. In this demo the prompts are three plain-text files, so changing what reaches Team Shared or Leadership Shared means editing one of them.
 
 A prompt only decides what is copied into a shared space. Who can read a space is decided by the Chain: a Developer's Chain has no Leadership Shared, so no prompt can send a Developer anything from it. The idea behind Node modes and routing is in [Concepts](concepts.md#routing-prompts-and-node-modes).
 
@@ -21,7 +25,10 @@ In the Basic Example the Team Shared node of a Leader's Chain is read-only and u
 3. Run `./bin/sharedmem-admin verify` and read the table of expected against actual.
 4. Repeat until the Cases pass.
 
-A new prompt applies to what people say from then on. Memories already saved stay where they are. A change can take a few minutes to show on the server (see [Known gaps](known-gaps.md)).
+Good to know:
+
+- A new prompt applies to what people say from then on. Memories already saved stay where they are.
+- A change can take a few minutes to show on the server (see [Known gaps](known-gaps.md)).
 
 ## Write a good prompt
 
@@ -43,4 +50,7 @@ The shipped prompts are about 400 characters each. They follow a pattern worth k
 
 `export` also hands these sentences to people: the Cases whose ids are a letter and a number (T1, L2, W1, N1) are picked by role and position. To try your own sentences once, run `verify --cases <file>` with a file of the same shape. The file is checked completely before anything is sent.
 
-A language model makes the decision, so one run can differ from the next. When a Case fails, run `verify` once more before you change a prompt. The Cases are a spot check, not a guarantee.
+A language model makes the decision, so one run can differ from the next:
+
+- When a Case fails, run `verify` once more before you change a prompt.
+- The Cases are a spot check, not a guarantee.

@@ -65,8 +65,10 @@ function restrictCredentialsFile(env) {
   const file = path.join(env.MEM9_HOME || path.join(os.homedir(), '.mem9'), '.credentials.json');
   try {
     fs.chmodSync(file, 0o600);
+    return true;
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
+    return false;
   }
 }
 
@@ -105,7 +107,7 @@ export async function configure({ io, env, person, dir, context }) {
     { [KEY_VARIABLE]: person.chainKey },
   );
   if (parseResult(saved.stdout)?.status !== 'ok') throw new CliError('The plugin\'s setup command did not report success while saving the profile.', { next: 'Run this program again; if it keeps failing, see the troubleshooting guide.' });
-  restrictCredentialsFile(env);
+  const credentialsRestricted = restrictCredentialsFile(env);
 
   const usage = await runTool({ command: process.execPath, args: [script, 'scope', 'apply', '--help'], cwd: dir, env });
   const supportsAgentId = usage.code === 0 && `${usage.stdout}${usage.stderr}`.includes('--agent-id');
@@ -114,13 +116,16 @@ export async function configure({ io, env, person, dir, context }) {
   const applied = await setup(applyArgs);
   if (parseResult(applied.stdout)?.status !== 'ok') throw new CliError('The plugin\'s setup command did not report success while applying the profile.', { next: 'Run this program again; if it keeps failing, see the troubleshooting guide.' });
   io.out('Configured the Codex plugin for this project.');
-  return { supportsAgentId };
+  return { supportsAgentId, credentialsRestricted };
 }
 
 export function nextSteps({ dir, result }) {
+  const credentials = result?.credentialsRestricted
+    ? 'this program makes that file owner-only'
+    : 'this program could not find that file to make it owner-only, so check that other users of the computer cannot read it';
   const notes = [
     'Restart Codex if it is already running, so it picks up the new plugin.',
-    'Setting up the plugin also repairs your user-level Codex hook files (under your Codex home folder), and your key is saved in the plugin\'s user-level credentials file (this program makes that file owner-only). Only the project settings stay inside the project.',
+    `Setting up the plugin also repairs your user-level Codex hook files (under your Codex home folder), and your key is saved in the plugin's user-level credentials file (${credentials}). Only the project settings stay inside the project.`,
   ];
   if (!result?.supportsAgentId) {
     notes.push('The installed Codex plugin cannot set an Agent ID yet, so that step was skipped: your Codex writes under the shared Agent ID "codex", and near-duplicate facts from different people can merge. Update the plugin and run this program again once it supports Agent IDs.');

@@ -68,8 +68,10 @@ if (group === 'profile' && command === 'save-key') {
   // Like the real script (observed in the isolated Linux machine): the file is created
   // with the default mode, so it is readable by other users of the computer, and the
   // reported path is the literal text "$MEM9_HOME/.credentials.json".
-  fs.writeFileSync(file, JSON.stringify(existing, null, 2));
-  fs.chmodSync(file, 0o644);
+  if (process.env.STANDIN_SETUP_NO_CREDENTIALS_FILE !== '1') {
+    fs.writeFileSync(file, JSON.stringify(existing, null, 2));
+    fs.chmodSync(file, 0o644);
+  }
   console.log(JSON.stringify({ status: 'ok', command: 'profile.save-key', profileId: options.profile, action: 'created', baseUrl: options['base-url'] ?? '', credentialsPath: '$MEM9_HOME/.credentials.json', apiKeyEnv: options['api-key-env'], backups: [] }));
   process.exit(0);
 }

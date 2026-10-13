@@ -177,6 +177,17 @@ test('Codex: the credentials file that holds the key is made owner-only', async 
   assert.equal(fs.statSync(path.join(env.MEM9_HOME, '.credentials.json')).mode & 0o777, 0o600);
 });
 
+test('Codex: when the credentials file cannot be found, the guidance says it was not restricted instead of claiming it was', async (t) => {
+  const { h, project, run } = await setup(t);
+  gitInit(h, project);
+  const missing = await run(['--agent', 'codex', '--dir', project, '--yes'], { env: h.env({ extra: { STANDIN_SETUP_AGENT_ID: '1', STANDIN_SETUP_NO_CREDENTIALS_FILE: '1' } }) });
+  assert.equal(missing.code, 0, missing.output);
+  assert.doesNotMatch(missing.stdout, /makes that file owner-only/);
+  assert.match(missing.stdout, /could not find that file to make it owner-only/);
+  const found = await run(['--agent', 'codex', '--dir', project, '--yes'], { env: h.env({ extra: { STANDIN_SETUP_AGENT_ID: '1' } }) });
+  assert.match(found.stdout, /this program makes that file owner-only/);
+});
+
 test('Codex: without Agent ID support in the setup command, that step is skipped with a notice and setup completes', async (t) => {
   const { h, project, run } = await setup(t);
   gitInit(h, project);

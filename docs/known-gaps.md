@@ -4,7 +4,9 @@ What the demo does not do, or cannot guarantee. Read this before showing it to a
 
 ## Access and security
 
-1. **A webhook endpoint belongs to a Chain, not to one node.** In the Approval Example a Leader Chain's receiver also receives deliveries for facts auto-routed to Leadership Shared, including their text. The receiver acts only on deliveries that were held back (webhook-only).
+1. **A webhook endpoint belongs to a Chain, not to one node.**
+   - In the Approval Example a Leader Chain's receiver also receives deliveries for facts auto-routed to Leadership Shared, including their text.
+   - The receiver acts only on deliveries that were held back (webhook-only).
 2. **Node modes govern routing only.** A Chain API key can read, update and delete Memories in every Space its Chain contains. The real boundary is which Spaces a Chain contains, not its Node modes.
 3. **Chain management uses the Chain API key**, the same key a person's plugin holds.
    - A person could change the Routing prompts of their own Chain.
@@ -28,7 +30,9 @@ What the demo does not do, or cannot guarantee. Read this before showing it to a
 10. **Two `candidates approve` of the same Candidate at the same time can write the Memory twice.**
     - The program tells when it loses the race. If that happens, delete the extra Memory with the Memory list of the Space.
     - One person approving one Candidate at a time is the supported use.
-11. **A receiver that was killed (not stopped with Ctrl+C) leaves `state/receiver.json` behind.** The next start checks that the recorded process is alive and replaces the file; if the number was reused by an unrelated process, delete the file by hand.
+11. **A receiver that was killed (not stopped with Ctrl+C) leaves `state/receiver.json` behind.**
+    - The next start checks that the recorded process is alive and replaces the file.
+    - If the number was reused by an unrelated process, delete the file by hand.
 
 ## Routing and reading
 
@@ -46,7 +50,9 @@ What the demo does not do, or cannot guarantee. Read this before showing it to a
 18. **Installing the Codex plugin changes the person's user-level Codex hook files** and stores the Chain's key in a user-level credentials file (`$MEM9_HOME/.credentials.json`, default `~/.mem9/`).
     - The plugin creates that file readable by other users of the computer, so the Participant program restricts it to its owner.
     - Only the project override (the project settings) is project-local.
-19. **The Claude Code settings file holds the Chain key.** `.claude/settings.local.json` in the project is made owner-only, but the program does not touch the project's `.gitignore`. Check that the file is ignored before committing a project that was set up.
+19. **The Claude Code settings file holds the Chain key.**
+    - `.claude/settings.local.json` in the project is made owner-only, but the program does not touch the project's `.gitignore`.
+    - Check that the file is ignored before committing a project that was set up.
 20. **The automated tests do not cover real agent sessions or real HTTPS deliveries.**
     - Installing and configuring the real Claude Code and Codex plugins was checked by hand in a disposable Linux environment, not by the test suite.
     - The key reaching a running agent session (for Claude Code through the settings environment) and a delivery through a public tunnel are for you to try with the Try it steps.

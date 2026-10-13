@@ -77,7 +77,7 @@ test('the state file is owner-only with an owner-only backup, and no output show
 test('init shows its plan, changes nothing without a terminal and --yes, and says which flag to pass', async (t) => {
   const h = await withHarness(t);
   const result = await h.admin(['init']);
-  assert.equal(result.code, 1);
+  assert.equal(result.code, 2, 'a missing confirmation is a usage error');
   assert.match(result.stdout, /Plan/);
   assert.match(result.stdout, /8 Spaces/);
   assert.match(result.stderr, /--yes/);

@@ -27,7 +27,7 @@ test('teardown deletes the Chains and nothing else, and the state keeps the Spac
 test('teardown lists what it will delete and asks first; without a terminal it needs --yes', async (t) => {
   const h = await initialized(t);
   const result = await h.admin(['teardown']);
-  assert.equal(result.code, 1);
+  assert.equal(result.code, 2, 'a missing confirmation is a usage error');
   assert.match(result.stdout, /sharedmem-demo-ana/);
   assert.match(result.stderr, /--yes/);
   assert.equal(h.count('DELETE', /^\/v1alpha2\/space-chains\//), 0);

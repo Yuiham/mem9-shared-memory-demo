@@ -52,6 +52,7 @@ export function reportError(io, error) {
     return error.code;
   }
   io.err(`error: unexpected failure: ${error?.message ?? error}`);
+  io.err('next: Run the command again. If it keeps failing, see docs/troubleshooting.md.');
   return 1;
 }
 

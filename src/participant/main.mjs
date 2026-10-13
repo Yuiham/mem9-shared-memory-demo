@@ -51,7 +51,7 @@ async function chooseAgent(io, flag) {
 async function chooseDirectory(io, flag) {
   let chosen = flag;
   if (chosen === undefined) {
-    if (!io.isTTY) throw new CliError('No project directory was given.', { next: 'Pass --dir <directory> to choose without a prompt.' });
+    if (!io.isTTY) throw new UsageError('No project directory was given.', { next: 'Pass --dir <directory> to choose without a prompt.' });
     chosen = await askText(io, 'Project directory', process.cwd());
   }
   const dir = path.resolve(chosen);

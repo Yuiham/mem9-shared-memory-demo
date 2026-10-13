@@ -205,7 +205,7 @@ test('Codex: the setup script is taken from the local directory when there is on
 test('Codex: a directory that is not a Git repository is initialized only after asking, and --yes answers', async (t) => {
   const { h, project, run } = await setup(t);
   const refused = await run(['--agent', 'codex', '--dir', project]);
-  assert.equal(refused.code, 1);
+  assert.equal(refused.code, 2, 'a missing confirmation is a usage error');
   assert.match(refused.stderr, /--yes/);
   assert.match(refused.stdout, /git init.*not inside a Git repository/i, 'the plan says it would run git init');
   assert.equal(fs.existsSync(path.join(project, '.git')), false);
@@ -282,13 +282,13 @@ test('Codex: a plugin cache without the setup script is explained', async (t) =>
 test('without a terminal nothing prompts: a missing agent, directory or confirmation is an error naming the flag', async (t) => {
   const { h, project, run } = await setup(t);
   const noAgent = await run(['--dir', project, '--yes']);
-  assert.equal(noAgent.code, 1);
+  assert.equal(noAgent.code, 2, 'a missing choice is a usage error');
   assert.match(noAgent.stderr, /--agent/);
   const noDir = await run(['--agent', 'claude', '--yes']);
-  assert.equal(noDir.code, 1);
+  assert.equal(noDir.code, 2, 'a missing choice is a usage error');
   assert.match(noDir.stderr, /--dir/);
   const noConfirmation = await run(['--agent', 'claude', '--dir', project]);
-  assert.equal(noConfirmation.code, 1);
+  assert.equal(noConfirmation.code, 2, 'a missing confirmation is a usage error');
   assert.match(noConfirmation.stderr, /--yes/);
   assert.match(noConfirmation.stdout, /Plan/, 'the plan is shown before asking');
   assert.deepEqual(commandsOf(h, 'claude'), []);

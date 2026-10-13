@@ -1,12 +1,12 @@
 // Prompts. Nothing here ever asks anything without a terminal: callers get an error
 // that names the flag to pass instead.
 import readline from 'node:readline';
-import { CliError } from './cli.mjs';
+import { CliError, UsageError } from './cli.mjs';
 
 export async function confirm(io, question, { yes = false } = {}) {
   if (yes) return true;
   if (!io.isTTY) {
-    throw new CliError(`${question} This needs your confirmation, but there is no terminal to ask.`, {
+    throw new UsageError(`${question} This needs your confirmation, but there is no terminal to ask.`, {
       next: 'Run the command again with --yes to confirm in advance.',
     });
   }
@@ -32,7 +32,7 @@ function ask(io, prompt) {
 // choices: [{ value, label }]. Arrow keys and Enter on a terminal.
 export async function select(io, title, choices, { flag }) {
   if (!io.isTTY) {
-    throw new CliError(`No choice was made for: ${title}.`, { next: `Pass ${flag} to choose without a prompt.` });
+    throw new UsageError(`No choice was made for: ${title}.`, { next: `Pass ${flag} to choose without a prompt.` });
   }
   readline.emitKeypressEvents(io.stdin);
   const wasRaw = io.stdin.isRaw;
@@ -61,7 +61,7 @@ export async function select(io, title, choices, { flag }) {
       if (key.name === 'up') index = (index + choices.length - 1) % choices.length;
       else if (key.name === 'down') index = (index + 1) % choices.length;
       else if (key.name === 'return') return finish(() => resolve(choices[index].value));
-      else if (key.ctrl && key.name === 'c') return finish(() => reject(new CliError('Cancelled.')));
+      else if (key.ctrl && key.name === 'c') return finish(() => reject(new CliError('Cancelled. Nothing was changed.', { next: 'Run the command again when you are ready.' })));
       draw();
     };
     io.stdin.on('keypress', onKey);

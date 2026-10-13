@@ -68,7 +68,7 @@ async function chooseDirectory(io, flag) {
 }
 
 export async function main(argv, { stdout, stderr, stdin, env = process.env } = {}) {
-  const io = createIo({ stdout, stderr, stdin });
+  const io = createIo({ stdout, stderr, stdin, help: 'the section "If something goes wrong" in the README of your Kit' });
   try {
     const { values } = parseOptions(PROGRAM, OPTIONS, argv);
     if (values.help) {

@@ -24,6 +24,9 @@ export function createIo({
   stderr = process.stderr,
   stdin = process.stdin,
   redactor = new Redactor(),
+  // Where to send a reader after an unexpected failure. A Kit has no docs folder, so the
+  // Participant program names its own README instead.
+  help = 'docs/troubleshooting.md',
 } = {}) {
   const warned = new Set();
   const write = (stream, text) => {
@@ -31,6 +34,7 @@ export function createIo({
   };
   return {
     redactor,
+    help,
     stdin,
     stdout,
     isTTY: Boolean(stdin.isTTY && stdout.isTTY),
@@ -52,7 +56,7 @@ export function reportError(io, error) {
     return error.code;
   }
   io.err(`error: unexpected failure: ${error?.message ?? error}`);
-  io.err('next: Run the command again. If it keeps failing, see docs/troubleshooting.md.');
+  io.err(`next: Run the command again. If it keeps failing, see ${io.help ?? 'docs/troubleshooting.md'}.`);
   return 1;
 }
 

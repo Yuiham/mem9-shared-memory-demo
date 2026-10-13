@@ -25,3 +25,10 @@ test('an unexpected failure also names a next step', () => {
   assert.equal(lines[0], 'error: unexpected failure: boom');
   assert.match(lines[1], /^next: .*troubleshooting/);
 });
+
+test('an unexpected failure points at the help the program names, because a Kit has no docs folder', () => {
+  const lines = [];
+  const io = { err: (text) => lines.push(text), help: 'the README of your Kit' };
+  assert.equal(reportError(io, new TypeError('boom')), 1);
+  assert.equal(lines[1], 'next: Run the command again. If it keeps failing, see the README of your Kit.');
+});

@@ -106,7 +106,7 @@ export async function configure({ io, env, person, dir, context }) {
     ['profile', 'save-key', '--profile', profile, '--label', `Shared-memory demo (${person.name})`, '--base-url', person.serverUrl, '--api-key-env', KEY_VARIABLE],
     { [KEY_VARIABLE]: person.chainKey },
   );
-  if (parseResult(saved.stdout)?.status !== 'ok') throw new CliError('The plugin\'s setup command did not report success while saving the profile.', { next: 'Run this program again; if it keeps failing, see the troubleshooting guide.' });
+  if (parseResult(saved.stdout)?.status !== 'ok') throw new CliError('The plugin\'s setup command did not report success while saving the profile.', { next: 'Run this program again; if it keeps failing, see the section "If something goes wrong" in the README of your Kit.' });
   const credentialsRestricted = restrictCredentialsFile(env);
 
   const usage = await runTool({ command: process.execPath, args: [script, 'scope', 'apply', '--help'], cwd: dir, env });
@@ -114,7 +114,7 @@ export async function configure({ io, env, person, dir, context }) {
   const applyArgs = ['scope', 'apply', '--scope', 'project', '--profile', profile, ...(supportsAgentId ? ['--agent-id', person.agentId] : [])];
   io.out('Applying the profile to the project...');
   const applied = await setup(applyArgs);
-  if (parseResult(applied.stdout)?.status !== 'ok') throw new CliError('The plugin\'s setup command did not report success while applying the profile.', { next: 'Run this program again; if it keeps failing, see the troubleshooting guide.' });
+  if (parseResult(applied.stdout)?.status !== 'ok') throw new CliError('The plugin\'s setup command did not report success while applying the profile.', { next: 'Run this program again; if it keeps failing, see the section "If something goes wrong" in the README of your Kit.' });
   io.out('Configured the Codex plugin for this project.');
   return { supportsAgentId, credentialsRestricted };
 }

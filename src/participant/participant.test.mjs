@@ -129,6 +129,28 @@ test('Claude Code: a failing claude command stops the run with its name and outp
   assert.equal(fs.existsSync(path.join(project, '.claude', 'settings.local.json')), false);
 });
 
+// A Kit holds its own README and no docs folder, so after a failure nobody expected the
+// program must send the person to that README. A file named .claude in the project makes
+// the settings unreadable in a way the program does not handle on purpose.
+test('an unexpected failure points at the README of the Kit, which a Kit does contain', async (t) => {
+  const { kit, project, run } = await setup(t);
+  fs.writeFileSync(path.join(project, '.claude'), 'a file where a directory belongs');
+  const result = await run(['--agent', 'claude', '--dir', project, '--yes']);
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.stderr, /error: unexpected failure/);
+  assert.match(result.stderr, /next: .*see the section "If something goes wrong" in the README of your Kit\./);
+  assert.doesNotMatch(result.stderr, /docs\/|troubleshooting/);
+  assert.match(fs.readFileSync(path.join(kit.dir, 'README.md'), 'utf8'), /^## If something goes wrong$/m);
+});
+
+test('the program names no file that a Kit lacks', () => {
+  const dir = new URL('./', import.meta.url);
+  for (const name of fs.readdirSync(dir).filter((file) => file.endsWith('.mjs') && !file.endsWith('.test.mjs'))) {
+    const source = fs.readFileSync(new URL(name, dir), 'utf8');
+    assert.doesNotMatch(source, /docs\/|troubleshooting guide/i, `${name} points at something that is not in a Kit`);
+  }
+});
+
 test('Claude Code: a missing claude, bash or curl is named, and nothing is changed', async (t) => {
   const { h, project, run } = await setup(t);
   const missingClaude = await run(['--agent', 'claude', '--dir', project, '--yes'], { env: h.env({}, { omit: ['claude'], scenario: 'missing-claude' }) });

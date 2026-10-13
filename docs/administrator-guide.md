@@ -1,18 +1,35 @@
 # Administrator guide
 
-The Administrator prepares the environment on a mem9 server, checks the routing, hands out Kits and, in the Approval Example, approves announcements. Everything is done with `bin/sharedmem-admin <command>`. Run `bin/sharedmem-admin` with no arguments to list the commands, and `<command> --help` to see what a command changes, its options and examples.
+The Administrator prepares the environment on a mem9 server, checks the routing, hands out Kits and, in the Approval Example, approves announcements. Everything is done with `bin/sharedmem-admin <command>`.
 
-For the vocabulary (Space, Chain, Node mode, Example) read [Concepts](concepts.md) first if any of it is new.
+- Run `bin/sharedmem-admin` with no arguments to list the commands.
+- Run `<command> --help` to see what a command changes, its options and examples.
+- New to the vocabulary (Space, Chain, Node mode, Example)? Read [Concepts](concepts.md) first.
 
 ## Before you start
 
-- Node 22 or newer (`node --version`). No dependencies, nothing to install.
-- Copy `.env.example` to `.env` and set `SHAREDMEM_API_URL` to the mem9 server's address. A variable already set in your shell wins over the file. The address is masked in all output and never written anywhere else. If it starts with `http://`, the programs warn once per run: traffic is not encrypted, so use fictional data only.
-- `state/state.json` (created by `init`) records every key. Treat it as a secret and do not lose it (see [Troubleshooting](troubleshooting.md#i-lost-the-state-file)).
+- **Node 22 or newer** (`node --version`). No dependencies, nothing to install.
+- **The server address.** Copy `.env.example` to `.env` and set `SHAREDMEM_API_URL` to the mem9 server's address.
+  - A variable already set in your shell wins over the file.
+  - The address is masked in all output and never written anywhere else.
+  - If it starts with `http://`, the programs warn once per run: traffic is not encrypted, so use fictional data only.
+- **The state file.** `state/state.json` (created by `init`) records every key. Treat it as a secret and do not lose it (see [Troubleshooting](troubleshooting.md#i-lost-the-state-file)).
+
+## A typical rehearsal
+
+1. `init`, then `verify`; tune the prompts until the Cases pass.
+2. `export`; run a Kit yourself in a scratch directory to see what a Participant sees.
+3. Say the sample sentences to your agent, wait about a minute, ask the sample question; `memories --as <name>` shows what the server holds.
+4. Approval: `init --example approval`, `webhook set`, `receiver serve`, `simulate`, `candidates approve`.
+5. When done: `teardown`.
 
 ## The working directory
 
-The `.env` file, `state/` and `out/` all live in one working directory. It defaults to the repository. Redirect it with `--workdir <directory>` or the `SHAREDMEM_WORKDIR` variable, for example to rehearse without touching real data. The shipped content under `config/` is only read, never written.
+The `.env` file, `state/` and `out/` all live in one working directory.
+
+- It defaults to the repository.
+- Redirect it with `--workdir <directory>` or the `SHAREDMEM_WORKDIR` variable, for example to rehearse without touching real data.
+- The shipped content under `config/` is only read, never written.
 
 | Path | What it holds |
 | --- | --- |
@@ -25,7 +42,7 @@ All of these are owner-only files and are ignored by git.
 
 ## The cast
 
-By default the demo has two Leaders (`lucia`, `marco`) and four Developers (`ana`, `bruno`, `carla`, `diego`), listed in `config/cast.json`. To use another cast, either edit `config/cast.json` or pass a file of the same shape to `init`. The file is not remembered, so pass it on every `init`; a plain `init` reads `config/cast.json` again.
+By default the demo has two Leaders (`lucia`, `marco`) and four Developers (`ana`, `bruno`, `carla`, `diego`), listed in `config/cast.json`. To use another cast, either edit that file or pass a file of the same shape to `init`:
 
 ```
 ./bin/sharedmem-admin init --cast my-cast.json
@@ -35,28 +52,67 @@ By default the demo has two Leaders (`lucia`, `marco`) and four Developers (`ana
 { "participants": [ { "name": "lucia", "role": "leader" }, { "name": "ana", "role": "developer" } ] }
 ```
 
-Names are lowercase letters, digits and hyphens (at most 100 characters), unique, and not `seed`, `team-shared`, `leadership-shared` or anything starting with `verify-`. A cast needs at least one Leader and one Developer; beyond that any size works. A name becomes the person's Agent ID, their Chain name suffix and their Kit folder.
+The file is not remembered, so pass it on every `init`; a plain `init` reads `config/cast.json` again.
 
-A cast that drops someone who already has a Chain is refused until you run `teardown`.
+The rules:
+
+- A name uses lowercase letters, digits and hyphens, at most 100 characters, and is unique.
+- A name cannot be `seed`, `team-shared` or `leadership-shared`, and cannot start with `verify-`.
+- A cast needs at least one Leader and one Developer. Beyond that any size works.
+- A name becomes the person's Agent ID, their Chain name suffix and their Kit folder.
+- A cast that drops someone who already has a Chain is refused until you run `teardown`.
 
 ## Commands
 
+| Command | Use it to | Changes |
+| --- | --- | --- |
+| `init` | Build or update the environment | Server: Spaces, Chains, routing, Seed memories. Local: `state/` |
+| `verify` | Check the routing | Server: test Memories, removed afterwards |
+| `memories` | See where Memories landed | Nothing |
+| `export` | Build one Kit per person | `out/` |
+| `webhook set` | Register the Approval Example's endpoints | Server: endpoints. Local: signing secrets in `state/` |
+| `webhook deliveries` | See what the server tried to deliver | Nothing |
+| `receiver serve` | Receive the server's deliveries | `state/candidates.json`, `state/receiver.json` |
+| `candidates` | List, approve or reject announcements | `approve` writes to Team Shared; `state/candidates.json` |
+| `simulate` | Show approval without a public address | A Candidate marked simulated |
+| `teardown` | Delete the Chains | Server: Chains. Local: `state/` |
+
 ### `init`
 
-Creates (or reuses) one Personal space per person plus Team Shared and Leadership Shared, one Chain per person, the routing rules for the chosen Example, and the Seed memories. It validates the cast, the Example and every Routing prompt's length before any server call, shows its plan and asks (`--yes` skips the question; without a terminal and without `--yes` it fails and says so).
+Creates or reuses the whole environment:
+
+- one Personal space per person, plus Team Shared and Leadership Shared;
+- one Chain per person;
+- the routing rules for the chosen Example;
+- the Seed memories.
+
+Before any server call it validates the cast, the Example and the length of every Routing prompt. Then it shows its plan and asks. `--yes` skips the question; without a terminal and without `--yes` it fails and says so.
 
 - `--example basic|approval` chooses the Example. The first run defaults to Basic; a re-run without the flag keeps the recorded one.
-- Safe to re-run: what exists is reused; a Chain whose nodes already match is untouched; a Chain the server no longer knows is created again on the same Spaces (its key changes, so export the Kits again).
+- Safe to re-run: what exists is reused, and a Chain whose nodes already match is untouched. A Chain the server no longer knows is created again on the same Spaces; its key changes, so export the Kits again.
 - Switching Examples changes one routing rule in place. Chains and keys stay the same, so Kits already handed out keep connecting. Run `export` again to refresh the Example label inside them.
 - It warns when you apply Approval with no webhook registered, because announcements would be lost.
 
 ### `verify`
 
-Sends every Case (a sample sentence with where it should land) through the real routing path, one at a time, and prints a table of expected against actual with PASS, FAIL or SKIP. The exit code is 1 when a Case fails.
+Sends every Case (a sample sentence with where it should land) through the real routing path, one at a time. It prints a table of expected against actual with PASS, FAIL or SKIP. The exit code is 1 when a Case fails.
 
-- Each Case is written through the Chain of the first person with the speaker's role, under its own Agent ID `verify-<run>-<case>`, using the server's synchronous write, and then read back from the speaker's Personal space, Team Shared and Leadership Shared. Everything it wrote is removed afterwards, of every Memory type.
+How it checks a Case:
+
+- It writes the Case through the Chain of the first person with the speaker's role, under its own Agent ID `verify-<run>-<case>`, using the server's synchronous write.
+- It reads back the speaker's Personal space, Team Shared and Leadership Shared.
+- Afterwards it removes everything it wrote, of every Memory type.
 - A routing step that fails on the server still lets the write succeed, so a missing copy is reported as a failure.
-- Approval Example: a Case that should become a Candidate passes when nothing reached Team Shared and the server recorded a new routed-fact delivery for the Chain. If the receiver is running and the webhook address is a real one, the matching Candidate must also arrive; it is a test Candidate, hidden from the default `candidates` listing. Without a registered webhook these Cases are skipped with a notice. `--wait <seconds>` (default 15) sets how long to wait for the delivery record and the Candidate.
+
+In the Approval Example:
+
+- A Case that should become a Candidate passes when nothing reached Team Shared and the server recorded a new routed-fact delivery for the Chain.
+- If the receiver is running and the webhook address is a real one, the matching Candidate must also arrive. It is a test Candidate, hidden from the default `candidates` listing.
+- Without a registered webhook these Cases are skipped with a notice.
+- `--wait <seconds>` (default 15) sets how long to wait for the delivery record and the Candidate.
+
+Other options and caveats:
+
 - `--cases <file>` replaces the shipped Cases, for a spot check with fresh sentences. The file has the same fields as `config/cases.json` and is validated completely before anything is sent.
 - Routing is judged by a language model and can vary between runs. A pass is a spot check, not a guarantee. If a Case fails, [tune the Routing prompts](routing-prompts.md#change-a-prompt) and verify again.
 
@@ -73,11 +129,23 @@ Shows where Memories landed.
 
 Builds `out/kits/<name>/` for every person and `out/report.md` (who gets which Kit and which Example is active, with no secrets). Everything is rebuilt from scratch: the previous Kits and report are removed first, other files in `out/` stay.
 
-A Kit contains the Participant program, the code it needs, a `person.json` (owner-only) and a `README.md` (the [Participant guide](participant-guide.md)). It never contains tests, administrator code or anyone else's key. The person file holds the person's name, role, server address, own chain key, Agent ID, sample sentences, sample question with what it should find, and the Example at export time. **A Kit is a secret.** Send each person only their own, for example as a zip.
+A Kit contains:
+
+- the Participant program and the code it needs;
+- `person.json` (owner-only): the person's name, role, server address, own chain key, Agent ID, sample sentences, sample question with what it should find, and the Example at export time;
+- `README.md`: the [Participant guide](participant-guide.md).
+
+A Kit never contains tests, administrator code or anyone else's key. **A Kit is a secret.** Send each person only their own, for example as a zip.
 
 ### `webhook set --url <address> [--test]`
 
-Approval Example. Registers one webhook endpoint on every Leader Chain, subscribed only to routed-fact events, and records each signing secret in the state (the secret is shown by the server once and is never printed here). Running it again updates the address and keeps the secret.
+Approval Example only.
+
+- Registers one webhook endpoint on every Leader Chain, subscribed only to routed-fact events.
+- Records each signing secret in the state. The server shows a secret once, and it is never printed here.
+- Running it again updates the address and keeps the secret.
+
+About the address:
 
 - The server requires an HTTPS address without credentials and refuses a literal private IP address such as `127.0.0.1`. It resolves host names only when it delivers. The program leaves the judgment to the server and explains a rejection.
 - With no public address yet, register the placeholder `https://receiver.invalid/`: it is accepted and can never deliver. That is enough for `verify` and `simulate`. Do not combine it with `--test`.
@@ -85,13 +153,27 @@ Approval Example. Registers one webhook endpoint on every Leader Chain, subscrib
 
 ### `webhook deliveries [--leader <name>]`
 
-Lists the server's delivery records for every Leader Chain (or one with `--leader`), newest first, with status (`pending`, `delivered` or `failed`), attempts, the last HTTP status and the last error. Use it to see whether the server tried to deliver and what went wrong. Records carry no event content and do not say which node a delivery was for.
+Lists the server's delivery records for every Leader Chain (or one with `--leader`), newest first. Each record shows:
+
+- the status: `pending`, `delivered` or `failed`;
+- the number of attempts;
+- the last HTTP status and the last error.
+
+Use it to see whether the server tried to deliver and what went wrong. Records carry no event content and do not say which node a delivery was for.
 
 ### `receiver serve [--port <number>]`
 
 Runs the local receiver in the foreground until Ctrl+C. It listens on `127.0.0.1` only (default port 8787; `--port 0` picks a free one), accepts deliveries on any path, and prints where it listens.
 
-For each delivery it checks the signature with the secret recorded for the delivery's Chain, refuses timestamps more than five minutes from this computer's clock, ignores duplicates (also after a restart), and acknowledges but ignores deliveries that were not held back. Each source fact of a held-back announcement becomes one Candidate, attributed to the Leader whose Chain produced the delivery. It answers within milliseconds with a 2xx status, which is the only answer the server counts as delivered.
+For each delivery it:
+
+- checks the signature with the secret recorded for the delivery's Chain;
+- refuses timestamps more than five minutes from this computer's clock;
+- ignores duplicates, also after a restart;
+- acknowledges but ignores deliveries that were not held back;
+- turns each source fact of a held-back announcement into one Candidate, attributed to the Leader whose Chain produced the delivery.
+
+It answers within milliseconds with a 2xx status, which is the only answer the server counts as delivered.
 
 ### `candidates [list | approve <id> | reject <id>]`
 
@@ -102,11 +184,14 @@ For each delivery it checks the signature with the secret recorded for the deliv
 
 ### `simulate --leader <name> --text <announcement>`
 
-Posts a correctly signed delivery to the running receiver, as if the server had held an announcement back, so you can demonstrate approval without a public address. The Candidate is marked simulated. It needs the receiver to be running in the same working directory and the Leader to have a registered endpoint (the placeholder is enough).
+Posts a correctly signed delivery to the running receiver, as if the server had held an announcement back, so you can demonstrate approval without a public address. The Candidate is marked simulated. It needs:
+
+- the receiver running in the same working directory;
+- a registered endpoint for the Leader (the placeholder is enough).
 
 ### `teardown`
 
-Deletes the Chains this demo created, after listing them and asking (`--yes` skips the question). Spaces and their Memories remain, because the server cannot delete Spaces; the state keeps their keys, so a later `init` reuses them.
+Deletes the Chains this demo created, after listing them and asking (`--yes` skips the question). Spaces and their Memories remain, because the server cannot delete Spaces. The state keeps their keys, so a later `init` reuses them.
 
 ## Receiving real deliveries
 
@@ -131,12 +216,7 @@ Everything shipped is a plain file under `config/`:
 | `seed-memories.json` | The pinned starting Memories in Team Shared and Leadership Shared |
 | `sample-questions.json` | The question each person is asked to try, with what it should find |
 
-After editing a Routing prompt run `init` to apply it and `verify` to check it ([how](routing-prompts.md#change-a-prompt)). Sample sentences are assigned by role and position: a Developer in position `i` gets the Cases `T` number `(i mod 4) + 1` and `N` number `(i mod 2) + 1`; a Leader in position `j` gets the two `L` Cases starting at number `(2j mod 4) + 1` and `W` number `(j mod 2) + 1`, wrapping around for larger casts.
-
-## A typical rehearsal
-
-1. `init`, then `verify`; tune the prompts until the Cases pass.
-2. `export`; run a Kit yourself in a scratch directory to see what a Participant sees.
-3. Say the sample sentences to your agent, wait about a minute, ask the sample question; `memories --as <name>` shows what the server holds.
-4. Approval: `init --example approval`, `webhook set`, `receiver serve`, `simulate`, `candidates approve`.
-5. When done: `teardown`.
+- After editing a Routing prompt, run `init` to apply it and `verify` to check it ([how](routing-prompts.md#change-a-prompt)).
+- Sample sentences are assigned by role and position, and wrap around for larger casts:
+  - a Developer in position `i` gets the Cases `T` number `(i mod 4) + 1` and `N` number `(i mod 2) + 1`;
+  - a Leader in position `j` gets the two `L` Cases starting at number `(2j mod 4) + 1` and `W` number `(j mod 2) + 1`.

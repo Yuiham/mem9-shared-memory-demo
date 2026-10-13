@@ -1,9 +1,9 @@
 # Shared-memory demo
 
-A hands-on demo of mem9 shared memory (Space Chains) for a small team. Each person works with their own coding agent, Claude Code or Codex, and mem9 decides which memories reach which people:
+A hands-on demo of mem9 shared memory (Space Chains) for a small team. Each person works with their own coding agent, Claude Code or Codex. What they say is saved as Memories, and mem9 routes the lasting facts to the right shared spaces:
 
 - **Team knowledge** goes to a shared space everyone reads (**Team Shared**).
-- **Leadership matters** go to a shared space only leaders read (**Leadership Shared**).
+- **Leadership matters** go to a shared space only Leaders read (**Leadership Shared**).
 - **Personal preferences** stay in each person's own space.
 
 Use it to:
@@ -27,22 +27,22 @@ Four words you will meet:
 
 ```mermaid
 flowchart LR
-  D["A developer says something"] --> DP["Their Personal space"]
+  D["A Developer says something"] --> DP["Their Personal space"]
   D --> TS["Team Shared<br/>everyone reads it"]
-  L["A leader says something"] --> LP["Their Personal space"]
-  L --> LS["Leadership Shared<br/>only leaders read it"]
+  L["A Leader says something"] --> LP["Their Personal space"]
+  L --> LS["Leadership Shared<br/>only Leaders read it"]
   L -. "Approval Example: proposed,<br/>saved after approval" .-> TS
 ```
 
 - Only lasting facts are saved. Chatter is ignored.
-- A person's Chain sets what they can read. A developer's Chain holds their Personal space and Team Shared; a leader's also holds Leadership Shared.
-- A language model decides which facts are copied into a shared space. It reads one short prompt per shared space, and you can edit the prompts.
+- A person's Chain sets what they can read: a Developer's Chain holds their Personal space and Team Shared, so Developers cannot read Leadership Shared; a Leader's Chain also holds it.
+- A language model decides which facts are copied into a shared space. It reads one short Routing prompt per shared space, and you can edit the prompts.
 
 | Someone says | It is saved in |
 | --- | --- |
-| "We always run database migrations before deploying the API." (a developer) | Their Personal space and Team Shared |
-| "We approved a forty thousand dollar budget for the payments vendor migration." (a leader) | Their Personal space and Leadership Shared |
-| "Starting Monday, all production deploys require two reviewers." (a leader) | Basic Example: their Personal space only. Approval Example: also proposed to Team Shared |
+| "We always run database migrations before deploying the API." (a Developer) | Their Personal space and Team Shared |
+| "We approved a forty thousand dollar budget for the payments vendor migration." (a Leader) | Their Personal space and Leadership Shared |
+| "Starting Monday, all production deploys require two reviewers." (a Leader) | Basic Example: their Personal space only. Approval Example: also proposed to Team Shared |
 | "I prefer a dark theme in my editor." (anyone) | Their Personal space only |
 
 ## What you need
@@ -51,7 +51,7 @@ flowchart LR
 - The address of a mem9 server that has the Space Chain API (the `server/` of [mem9-ai/mem9](https://github.com/mem9-ai/mem9) serves it under `/v1alpha2/space-chains`). The Administrator needs it; each Kit already carries it.
 - Claude Code or Codex on each Participant's computer.
 
-> **Use fictional data only.** A mem9 server may use plain HTTP, so never type anything real.
+> **Use fictional data only.** Every person and sentence in the demo is fictional, and a mem9 server may use plain HTTP, so never type anything real.
 
 ## The flow
 
@@ -86,14 +86,14 @@ cp .env.example .env          # set SHAREDMEM_API_URL in .env to your server (gi
 
 - a Personal space and a Chain for every person;
 - the two shared spaces;
-- the three routing prompts, from `config/routing-prompts/`;
+- the three Routing prompts, from `config/routing-prompts/`;
 - a few Seed memories for the sample questions to find.
 
 It shows its plan and asks before it changes anything. It takes a minute or two.
 
 ### 2. Check the routing (Administrator)
 
-Routing is a language model reading a prompt, so check it before anyone depends on it.
+Routing is a language model reading a Routing prompt, so check it before anyone depends on it.
 
 ```
 ./bin/sharedmem-admin verify
@@ -105,7 +105,7 @@ Routing is a language model reading a prompt, so check it before anyone depends 
 - compares where each one landed with where it should;
 - removes the Memories it wrote.
 
-It takes a few minutes. A language model makes the decision, so one run can differ from the next: if a Case fails, run `verify` once more before you change anything. If it keeps failing, [tune the routing prompts](#tune-the-routing-prompts).
+It takes a few minutes. A language model makes the decision, so one run can differ from the next: if a Case fails, run `verify` once more before you change anything. If it keeps failing, [tune the Routing prompts](#tune-the-routing-prompts).
 
 ### 3. Hand out the Kits (Administrator)
 
@@ -165,9 +165,9 @@ See where the sentences ended up.
 
 When the rehearsal is over, `./bin/sharedmem-admin teardown` deletes the Chains. The server cannot delete Spaces, so they and their Memories stay.
 
-## Tune the routing prompts
+## Tune the Routing prompts
 
-The prompts decide what reaches the shared spaces. They are plain-text files in `config/routing-prompts/`:
+The Routing prompts decide what reaches the shared spaces. They are plain-text files in `config/routing-prompts/`:
 
 | File | Decides |
 | --- | --- |
@@ -185,9 +185,9 @@ Do this when `verify` keeps failing, or when you want the team to behave differe
 
 ## The Approval Example
 
-The two Examples differ in what happens to a leader's team-wide announcement:
+The two Examples differ in what happens to a Leader's team-wide announcement:
 
-- **Basic** (the default): it stays in the leader's Personal space.
+- **Basic** (the default): it stays in the Leader's Personal space.
 - **Approval**: it is not published to Team Shared. It becomes a **Candidate** that the Administrator approves first. This shows how a mem9 server can hold a fact back for a person to decide.
 
 Switching:
@@ -212,16 +212,14 @@ Everything the demo ships is a plain file under `config/`. Each command explains
 
 | To change | Edit | Then |
 | --- | --- | --- |
-| Who takes part (default: 2 leaders, 4 developers) | `config/cast.json`, or `init --cast <file>` (pass it on every `init`) | `init`, then `export` |
+| Who takes part (default: 2 Leaders, 4 Developers) | `config/cast.json`, or `init --cast <file>` (pass it on every `init`) | `init`, then `export` |
 | What gets routed where | `config/routing-prompts/*.txt` | `init`, then `verify` |
-| The sentences `verify` checks, which are also handed to people | `config/cases.json` (`verify --cases <file>` checks another file once) | `verify`, then `export` |
+| The sentences `verify` checks; Cases named T1, L1, W1, N1 and so on are also handed to people | `config/cases.json` (`verify --cases <file>` checks another file once) | `verify`, then `export` |
 | The facts the sample questions find | `config/seed-memories.json` | `init` |
-
-Only Cases whose ids are a letter and a number (`T1`, `L1`, `W1`, `N1` and so on) are handed to people.
 
 ## Documentation
 
-- [Administrator guide](docs/administrator-guide.md): a typical rehearsal, the working directory, the cast, every command, cleaning up.
+- [Administrator guide](docs/administrator-guide.md): every command, with a typical rehearsal to start from.
 - [Participant guide](docs/participant-guide.md): what a Participant does with a Kit. Each Kit includes it as its `README.md`.
 - [Routing prompts](docs/routing-prompts.md): which prompt does what, how to change one, how `verify` checks it.
 - [Concepts](docs/concepts.md): Spaces, Chains, keys, Node modes, Examples.
@@ -236,7 +234,7 @@ Only Cases whose ids are a letter and a number (`T1`, `L1`, `W1`, `N1` and so on
 
 ```
 bin/        the two launchers
-config/     shipped content: cast, routing prompts, Cases, Seed memories, sample questions
+config/     shipped content: cast, Routing prompts, Cases, Seed memories, sample questions
 docs/       the guides
 src/        administrator, participant, shared and testing support; tests sit beside the code
 state/      created by the Administrator program, holds every key (git-ignored)

@@ -16,15 +16,15 @@ The state records the server it was created for, and every command refuses to ru
 
 A Chain or Space key in the state is not known to the server. The usual causes:
 
-- A state file from another server.
-- A Chain deleted on the server. Running `init` creates it again on the same Spaces; its key changes, so run `export` again and hand out the new Kits.
+- The state file comes from another server.
+- A Chain was deleted on the server. Running `init` creates it again on the same Spaces; its key changes, so run `export` again and hand out the new Kits.
 
 ### `Cannot reach the mem9 server`
 
-Check the address and your network first. Then:
+Check the address and your network first. Other things to know:
 
-- A connection cut in the middle (`UND_ERR_SOCKET`, `ECONNRESET`) can also happen on a busy or distant server.
-- Reads and deletions are retried twice on their own. A write is never repeated, because the server may have processed it: the command stops and you run it again.
+- A connection cut in the middle (`UND_ERR_SOCKET`, `ECONNRESET`) can happen on a busy or distant server.
+- After a cut connection, a read or the deletion of Memories is retried twice on its own. Any other request is never repeated, because the server may have processed it: the command stops and you run it again.
 - `verify` removes the test Memories of every Case it started, including the one being written when the connection was cut.
 - A slow server is not an error. A few seconds per call is normal on a remote server, and `verify` takes about five minutes for twelve Cases.
 
@@ -89,8 +89,8 @@ Pass `--port <number>`, or `--port 0` for any free port. The receiver prints the
   - The key is a project-local setting, so it reaches the plugin only when Claude Code starts in that project.
   - Started elsewhere, the plugin has no key and provisions a new, empty Space of its own.
   - Close the session, `cd` to the directory the program printed, and start `claude` there.
-- Wait a minute after saying the sample sentences: plugin writes are asynchronous.
-- Codex: restart it after the plugin was installed, and start it from the configured project directory.
+- **The Memories are not there yet.** Wait a minute after saying the sample sentences: plugin writes are asynchronous.
+- **Codex needs a restart.** Restart it after the plugin was installed, and start it from the configured project directory.
 
 ### `claude was not found`, `codex was not found`, `git was not found`, `bash`, `curl`
 

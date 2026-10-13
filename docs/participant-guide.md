@@ -50,7 +50,7 @@ It never starts your agent. When it finishes it prints:
 - the directory to enter and the command to run (open a new terminal window for that);
 - your sample sentences, a sample question and what the answer should contain.
 
-Two things to remember:
+Before you start the agent:
 
 - Codex must be restarted after the plugin is installed.
 - Always start your agent from the configured directory. If the plugin starts without your key, it creates a new, empty space of its own instead of using your Chain.

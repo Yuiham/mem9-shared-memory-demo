@@ -77,7 +77,7 @@ test('simulate refuses without a registered endpoint and says how to register a 
   const demo = await approvalDemo(t, { webhook: null });
   const result = await simulate(demo);
   assert.equal(result.code, 1);
-  assert.match(result.stderr, /webhook set/);
+  assert.match(result.stderr, /webhook set --url https:\/\/receiver\.invalid\//, 'the next step shows the address to type');
   assert.match(result.stderr, /placeholder/);
 });
 

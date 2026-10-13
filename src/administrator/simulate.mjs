@@ -49,7 +49,7 @@ export async function run(argv, { io, env, program }) {
   const webhook = state.webhooks?.[leader.name];
   if (!webhook) {
     throw new CliError(`${leader.name} has no registered webhook endpoint, so there is no signing secret to sign with.`, {
-      next: 'Run `sharedmem-admin webhook set --url ${PLACEHOLDER_URL}` (a placeholder is enough), then try again.',
+      next: `Run \`sharedmem-admin webhook set --url ${PLACEHOLDER_URL}\` (a placeholder is enough), then try again.`,
     });
   }
   const runtime = readRuntime(workdir);

@@ -119,10 +119,11 @@ test('an alternative Case file is validated completely before anything is sent',
     { id: 'D1', role: 'leader', sentence: 'x', reaches: { basic: ['personal', 'finance-shared'], approval: ['personal'] } },
     { id: 'E1', role: 'leader', sentence: 'x', reaches: { basic: ['personal', 'candidate'], approval: ['personal'] } },
     { id: 'F1', role: 'leader', sentence: 'x', reaches: { basic: ['personal'] } },
+    { id: 'G'.repeat(61), role: 'leader', sentence: 'x', reaches: { basic: ['personal'], approval: ['personal'] } },
   ] }));
   const result = await h.admin(['verify', '--cases', file]);
   assert.equal(result.code, 1);
-  for (const expected of [/"A1" is used more than once/, /"bad id!" may only use letters, digits and hyphens/, /"B1" needs the role "leader" or "developer"/, /"C1" has no sentence/, /"D1".*finance-shared/, /"E1".*candidate.*Approval/, /"F1".*approval/]) {
+  for (const expected of [/"A1" is used more than once/, /"bad id!" may only use letters, digits and hyphens/, /"B1" needs the role "leader" or "developer"/, /"C1" has no sentence/, /"D1".*finance-shared/, /"E1".*candidate.*Approval/, /"F1".*approval/, /"G{61}" is longer than 60 characters/]) {
     assert.match(result.stderr, expected);
   }
   assert.equal(h.fake.requests.length, requests, 'nothing was sent');

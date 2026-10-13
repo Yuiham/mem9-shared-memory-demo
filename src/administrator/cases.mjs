@@ -10,6 +10,8 @@ const SPACE_WORDS = ['personal', TEAM, LEADERSHIP];
 const ROLES = ['leader', 'developer'];
 const EXAMPLE_LABEL = { basic: 'Basic', approval: 'Approval' };
 
+const MAX_ID_LENGTH = 60;
+
 export function validateCases(document) {
   const list = Array.isArray(document) ? document : document?.cases;
   if (!Array.isArray(list) || list.length === 0) return ['The Case file needs a "cases" list with at least one Case.'];
@@ -21,6 +23,7 @@ export function validateCases(document) {
     if (typeof id !== 'string' || id === '') problems.push(`${label} has no id.`);
     else {
       if (!/^[A-Za-z0-9-]+$/.test(id)) problems.push(`The id "${id}" may only use letters, digits and hyphens.`);
+      if (id.length > MAX_ID_LENGTH) problems.push(`The id "${id}" is longer than ${MAX_ID_LENGTH} characters.`);
       if (seen.has(id)) problems.push(`The id "${id}" is used more than once.`);
       seen.add(id);
     }

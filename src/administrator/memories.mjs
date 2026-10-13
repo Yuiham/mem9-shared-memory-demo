@@ -47,7 +47,8 @@ function printRows(io, rows, { withSource }) {
 async function summarize({ ctx, types }) {
   const { io, store, mem9 } = ctx;
   const state = requireState(store);
-  const names = [...state.participants.map((person) => person.name), ...SHARED_SPACES].filter((name) => state.spaces[name]);
+  // Teardown forgets the Participants but keeps their Personal Spaces, so the Spaces are the source of truth.
+  const names = [...Object.keys(state.spaces).filter((name) => !SHARED_SPACES.includes(name)), ...SHARED_SPACES.filter((name) => state.spaces[name])];
   const counts = new Map();
   for (const name of names) {
     const row = [];
@@ -95,11 +96,14 @@ async function listAs({ ctx, person, types }) {
     if (!name) return memory.chain_source?.external_space_id || 'unknown';
     return SHARED_SPACES.includes(name) ? displayName(name) : 'Personal';
   };
-  const rows = [...(await mem9.listPage(chain.key)).memories];
-  if (!types.every((type) => LONG_TERM.includes(type))) rows.push(...(await mem9.listPage(chain.key, { memory_type: 'session' })).memories);
-  io.out(`What ${person} sees through their Chain: ${rows.length} Memories (${types.join(', ')}).`);
+  const pages = [await mem9.listPage(chain.key)];
+  if (!types.every((type) => LONG_TERM.includes(type))) pages.push(await mem9.listPage(chain.key, { memory_type: 'session' }));
+  const rows = pages.flatMap((page) => page.memories);
+  const total = pages.reduce((sum, page) => sum + page.total, 0);
+  io.out(`What ${person} sees through their Chain: ${rows.length} of ${total} Memories shown (${types.join(', ')}).`);
   io.out('');
   printRows(io, rows, { withSource: sourceOf });
+  if (total > rows.length) io.out(`\n  Only the first ${SHOWN} are shown.`);
   return 0;
 }
 

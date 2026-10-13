@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 import { SHIPPED_ROUTING, withHarness } from '../testing/harness.support.mjs';
 
@@ -106,4 +108,56 @@ test('memories --help says it only reads', async (t) => {
   const help = await h.admin(['memories', '--help']);
   assert.equal(help.code, 0);
   assert.match(help.stdout, /What it changes:\n\s+- Nothing/);
+});
+
+// ---- found by reviewing the finished work ----------------------------------------
+
+async function bulkWrite(h, space, count) {
+  const key = h.readState().spaces[space].key;
+  for (let index = 0; index < count; index += 1) {
+    const response = await fetch(`${h.fake.url}/v1alpha2/mem9s/memories`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': key, 'X-Mnemo-Agent-Id': 'sharedmem' },
+      body: JSON.stringify({ content: `Bulk fact number ${index}.`, memory_type: 'pinned', agent_id: 'bulk' }),
+    });
+    assert.ok(response.ok, `bulk write ${index}: ${response.status}`);
+  }
+}
+
+test('a Space with more Memories than the server\'s default page is listed up to 200, with a notice', async (t) => {
+  const h = await demo(t);
+  await bulkWrite(h, 'team-shared', 205);
+  const result = await h.admin(['memories', '--space', 'team-shared']);
+  assert.equal(result.code, 0, result.output);
+  assert.match(result.stdout, /200 of 208 Memories shown/);
+  assert.match(result.stdout, /Only the first 200 of each type are shown/);
+  const counts = await h.admin(['memories']);
+  assert.match(row(counts.stdout, 'team-shared (Team Shared)'), /\s208\s+0\s*$/, 'the counts use the server\'s total, not the page');
+});
+
+test('--as tells when the Chain holds more Memories than it shows', async (t) => {
+  const h = await demo(t);
+  await bulkWrite(h, 'team-shared', 205);
+  const result = await h.admin(['memories', '--as', 'ana']);
+  assert.equal(result.code, 0, result.output);
+  assert.match(result.stdout, /Only the first 200 are shown/);
+});
+
+test('after teardown the counts still list every Personal Space the state keeps', async (t) => {
+  const h = await demo(t);
+  assert.equal((await h.admin(['teardown', '--yes'])).code, 0);
+  const result = await h.admin(['memories']);
+  assert.equal(result.code, 0, result.output);
+  for (const name of ['lucia', 'marco', 'ana', 'bruno', 'carla', 'diego']) assert.match(row(result.stdout, `${name} (Personal)`), /\s0\s+0\s*$/, name);
+  assert.match(row(result.stdout, 'team-shared (Team Shared)'), /\s3\s+0\s*$/);
+});
+
+test('a state that has the right version but the wrong shape ends with a next step, not a bare error', async (t) => {
+  const h = await demo(t);
+  const state = h.readState();
+  fs.writeFileSync(path.join(h.workdir, 'state', 'state.json'), JSON.stringify({ version: state.version, serverUrl: state.serverUrl }));
+  const result = await h.admin(['memories']);
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /^error:/m);
+  assert.match(result.stderr, /^next:/m);
 });

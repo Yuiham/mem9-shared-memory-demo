@@ -334,6 +334,120 @@ test('nodes that drifted on the server are set again together with their policie
   assert.equal(after.chains.ana.key, before.chains.ana.key);
 });
 
+// The server does not return a node's Space key, so init remembers which key it wrote.
+
+test('init records, for each node, its Space and the key it was written with', async (t) => {
+  const { h } = await initialized(t);
+  const state = h.readState();
+  const recorded = (name) => state.chains[name].nodes.map(({ space, position, externalSpaceId, key }) => ({ space, position, externalSpaceId, key }));
+  const key = (space) => state.spaces[space].key;
+  assert.deepEqual(recorded('ana'), [
+    { space: 'ana', position: 0, externalSpaceId: '', key: key('ana') },
+    { space: 'team-shared', position: 1, externalSpaceId: 'team-shared', key: key('team-shared') },
+  ]);
+  assert.deepEqual(recorded('lucia'), [
+    { space: 'lucia', position: 0, externalSpaceId: '', key: key('lucia') },
+    { space: 'leadership-shared', position: 1, externalSpaceId: 'leadership-shared', key: key('leadership-shared') },
+    { space: 'team-shared', position: 2, externalSpaceId: 'team-shared', key: key('team-shared') },
+  ]);
+  for (const name of ['ana', 'lucia']) assert.deepEqual(state.chains[name].nodes.map((node) => node.id), nodesOf(h.fake, name).map((node) => node.id), name);
+});
+
+test('a Space that was provisioned again under the same name makes init set that Chain\'s nodes again, and only that one', async (t) => {
+  const { h } = await initialized(t);
+  const state = h.readState();
+  const replaced = state.spaces.ana.key;
+  delete state.spaces.ana;
+  fs.writeFileSync(path.join(h.workdir, 'state', 'state.json'), JSON.stringify(state));
+  const nodePuts = h.count('PUT', /\/nodes$/);
+  const second = await h.admin(['init', '--yes']);
+  assert.equal(second.code, 0, second.output);
+  const after = h.readState();
+  assert.notEqual(after.spaces.ana.key, replaced, 'a new Space was provisioned');
+  assert.equal(h.count('PUT', /\/nodes$/), nodePuts + 1, 'only the Chain of the replaced Space');
+  assert.equal(nodesOf(h.fake, 'ana')[0].tenant_id, after.spaces.ana.key, 'the owner node now points at the new Space');
+  assert.equal(after.chains.ana.nodes[0].key, after.spaces.ana.key);
+  assert.match(second.stdout, /ana: nodes set/);
+  assert.match(second.stdout, /bruno: nodes unchanged/);
+});
+
+test('Team Shared provisioned again makes every Chain set its nodes again, the Leaders at their third node', async (t) => {
+  const { h } = await initialized(t);
+  const state = h.readState();
+  const replaced = state.spaces['team-shared'].key;
+  delete state.spaces['team-shared'];
+  fs.writeFileSync(path.join(h.workdir, 'state', 'state.json'), JSON.stringify(state));
+  const nodePuts = h.count('PUT', /\/nodes$/);
+  const second = await h.admin(['init', '--yes']);
+  assert.equal(second.code, 0, second.output);
+  const after = h.readState();
+  assert.notEqual(after.spaces['team-shared'].key, replaced, 'a new Space was provisioned');
+  assert.equal(h.count('PUT', /\/nodes$/), nodePuts + 6, 'every Chain reaches Team Shared');
+  for (const name of ['ana', 'bruno', 'carla', 'diego', 'lucia', 'marco']) {
+    const shared = nodesOf(h.fake, name).find((node) => node.external_space_id === 'team-shared');
+    assert.equal(shared.tenant_id, after.spaces['team-shared'].key, `${name}: the Team Shared node follows the new Space`);
+  }
+  assert.equal(nodesOf(h.fake, 'lucia')[2].external_space_id, 'team-shared', 'a Leader reaches Team Shared at the third node');
+});
+
+test('a node the server shows under another id than the recorded one is set again, because the record is stale', async (t) => {
+  const { h } = await initialized(t);
+  const before = h.readState();
+  nodesOf(h.fake, 'ana')[0].id = 'node_replaced_elsewhere_0';
+  nodesOf(h.fake, 'bruno')[1].id = 'node_replaced_elsewhere_1';
+  const nodePuts = h.count('PUT', /\/nodes$/);
+  const second = await h.admin(['init', '--yes']);
+  assert.equal(second.code, 0, second.output);
+  assert.equal(h.count('PUT', /\/nodes$/), nodePuts + 2, 'the Chain whose owner node id changed and the Chain whose shared node id changed, and no other');
+  assert.match(second.stdout, /ana: nodes set/);
+  assert.match(second.stdout, /bruno: nodes set/);
+  assert.match(second.stdout, /carla: nodes unchanged/);
+  const after = h.readState();
+  for (const name of ['ana', 'bruno']) assert.deepEqual(after.chains[name].nodes.map((node) => node.id), nodesOf(h.fake, name).map((node) => node.id), name);
+  assert.notEqual(after.chains.ana.nodes[0].id, before.chains.ana.nodes[0].id);
+  assert.notEqual(after.chains.bruno.nodes[1].id, before.chains.bruno.nodes[1].id);
+});
+
+test('a Shared space provisioned again makes init set the nodes of the Chains that reach it, and only those', async (t) => {
+  const { h } = await initialized(t);
+  const state = h.readState();
+  const replaced = state.spaces['leadership-shared'].key;
+  delete state.spaces['leadership-shared'];
+  fs.writeFileSync(path.join(h.workdir, 'state', 'state.json'), JSON.stringify(state));
+  const nodePuts = h.count('PUT', /\/nodes$/);
+  const second = await h.admin(['init', '--yes']);
+  assert.equal(second.code, 0, second.output);
+  const after = h.readState();
+  assert.notEqual(after.spaces['leadership-shared'].key, replaced, 'a new Space was provisioned');
+  assert.equal(h.count('PUT', /\/nodes$/), nodePuts + 2, 'the two Leaders reach Leadership Shared');
+  for (const name of ['lucia', 'marco']) {
+    assert.equal(nodesOf(h.fake, name)[1].tenant_id, after.spaces['leadership-shared'].key, `${name}: the shared node follows the new Space`);
+    assert.match(second.stdout, new RegExp(`${name}: nodes set, 0 routing policies updated`), 'the server kept the Routing policies');
+  }
+  assert.match(second.stdout, /ana: nodes unchanged/);
+});
+
+test('a state written before the node record is repaired by one init, which keeps the Routing policies', async (t) => {
+  const { h } = await initialized(t);
+  const state = h.readState();
+  for (const chain of Object.values(state.chains)) for (const node of chain.nodes) delete node.key;
+  fs.writeFileSync(path.join(h.workdir, 'state', 'state.json'), JSON.stringify(state));
+  const nodePuts = h.count('PUT', /\/nodes$/);
+  const policyPuts = h.count('PUT', /routing-policy$/);
+  const second = await h.admin(['init', '--yes']);
+  assert.equal(second.code, 0, second.output);
+  assert.equal(h.count('PUT', /\/nodes$/), nodePuts + 6, 'every Chain sets its nodes once');
+  assert.equal(h.count('PUT', /routing-policy$/), policyPuts, 'the server kept each policy, so none is written again');
+  assert.match(second.stdout, /ana: nodes set, 0 routing policies updated/);
+  const repaired = h.readState();
+  for (const chain of Object.values(repaired.chains)) for (const node of chain.nodes) assert.equal(node.key, repaired.spaces[node.space].key);
+  const third = await h.admin(['init', '--yes']);
+  assert.equal(third.code, 0, third.output);
+  assert.equal(h.count('PUT', /\/nodes$/), nodePuts + 6, 'the run after the repair sets nothing');
+  assert.match(third.stdout, /ana: nodes unchanged, 0 routing policies updated/);
+  assert.deepEqual(h.readState(), repaired);
+});
+
 test('a Routing prompt of exactly the server limit is accepted', async (t) => {
   const h = await withHarness(t);
   const copy = h.copyProgram();

@@ -257,7 +257,19 @@ export class FakeMem9 {
   }
 
   #publicChain(chain) {
-    return { id: chain.id, name: chain.name, description: chain.description, status: 'active', created_at: chain.createdAt, nodes: chain.nodes.map((node) => ({ ...node })) };
+    return { id: chain.id, name: chain.name, description: chain.description, status: 'active', created_at: chain.createdAt, nodes: chain.nodes.map((node) => this.#nodeView(node)) };
+  }
+
+  // What the server shows of a node. The stored node keeps tenant_id, because routing
+  // needs it, but a read never returns the Space key. Optional strings the node has no
+  // value for are absent, as the real fields are omitempty.
+  #nodeView(node) {
+    const view = { ...node };
+    delete view.tenant_id;
+    for (const field of ['external_space_id', 'display_name', 'routing_policy_prompt']) {
+      if (view[field] === '') delete view[field];
+    }
+    return view;
   }
 
   async #chainRoute(method, chainId, rest, body, key, url) {
@@ -269,7 +281,7 @@ export class FakeMem9 {
       return { status: 204, body: null };
     }
     if (rest === '/nodes') {
-      if (method === 'GET') return { status: 200, body: { nodes: chain.nodes.map((node) => ({ ...node })) } };
+      if (method === 'GET') return { status: 200, body: { nodes: chain.nodes.map((node) => this.#nodeView(node)) } };
       if (method === 'PUT') return this.#setNodes(chain, body);
     }
     if ((match = rest.match(/^\/nodes\/([^/]+)\/routing-policy$/)) && method === 'PUT') return this.#setPolicy(chain, match[1], body);
@@ -326,7 +338,7 @@ export class FakeMem9 {
         routing_policy_webhook_only: position === 0 ? false : (kept?.routing_policy_webhook_only ?? false),
       };
     });
-    return { status: 200, body: { nodes: chain.nodes.map((node) => ({ ...node })) } };
+    return { status: 200, body: { nodes: chain.nodes.map((node) => this.#nodeView(node)) } };
   }
 
   #setPolicy(chain, nodeId, body) {
@@ -340,7 +352,7 @@ export class FakeMem9 {
     node.routing_policy_enabled = enabled;
     node.routing_policy_prompt = prompt;
     node.routing_policy_webhook_only = Boolean(body?.webhook_only);
-    return { status: 200, body: { ...node } };
+    return { status: 200, body: this.#nodeView(node) };
   }
 
   // ---- memories ----------------------------------------------------------------
@@ -463,8 +475,8 @@ export class FakeMem9 {
         this.#queueDelivery(context.chain, 'space_chain.fact_routed', {
           route_id: `route_${hex(6)}`,
           chain_id: context.chain.id,
-          source_tenant_id: context.owner.id,
-          target_tenant_id: node.tenant_id,
+          source_node_id: context.chain.nodes[0].id,
+          source_external_space_id: context.chain.nodes[0].external_space_id,
           target_external_space_id: node.external_space_id,
           routing_policy_node_id: node.id,
           webhook_only: node.routing_policy_webhook_only,
@@ -502,7 +514,7 @@ export class FakeMem9 {
       const rows = space.memories.filter(keep).sort((a, b) => b.seq - a.seq);
       for (const memory of rows) {
         const row = this.#publicMemory(memory);
-        if (node) row.chain_source = { chain_id: context.chain.id, node_position: node.position, tenant_id: node.tenant_id, external_space_id: node.external_space_id };
+        if (node) row.chain_source = { chain_id: context.chain.id, node_position: node.position, ...(node.external_space_id ? { external_space_id: node.external_space_id } : {}) };
         merged.push(row);
       }
     });

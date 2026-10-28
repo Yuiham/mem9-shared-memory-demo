@@ -106,24 +106,35 @@ async function configureChain({ ctx, person, example, prompts, created }) {
   }
   const chain = state.chains[person.name];
   const layout = nodeLayout(person, example, prompts);
-  const tenant = (space) => state.spaces[space].key;
+  const keyOf = (space) => state.spaces[space].key;
+  // The server does not show which Space a node points at, so the state remembers the node
+  // id and the mem9 API key each node was last written with. A node is unchanged only when
+  // the server still shows that id, that key is the one wanted now, and the names match.
+  // A node without such a record, as an older state has, is set again.
+  const recorded = chain.nodes ?? [];
   const current = [...(known?.nodes ?? [])].sort((a, b) => a.position - b.position);
   const sameNodes = current.length === layout.length && layout.every((wanted, index) => (
-    current[index].tenant_id === tenant(wanted.space)
+    recorded[index]?.id === current[index].id
+    && recorded[index]?.key === keyOf(wanted.space)
     && (current[index].external_space_id ?? '') === wanted.externalSpaceId
     && (current[index].display_name ?? '') === wanted.displayName
   ));
   let nodes = current;
   if (!sameNodes) {
     nodes = await mem9.setNodes(chain, layout.map((wanted) => ({
-      tenant_id: tenant(wanted.space),
+      tenant_id: keyOf(wanted.space),
       ...(wanted.externalSpaceId ? { external_space_id: wanted.externalSpaceId } : {}),
       display_name: wanted.displayName,
     })));
     nodes.sort((a, b) => a.position - b.position);
   }
-  const spaceOf = new Map(Object.entries(state.spaces).map(([name, space]) => [space.key, name]));
-  chain.nodes = nodes.map((node) => ({ id: node.id, space: spaceOf.get(node.tenant_id), position: node.position, externalSpaceId: node.external_space_id ?? '' }));
+  chain.nodes = layout.map((wanted, index) => ({
+    id: nodes[index].id,
+    space: wanted.space,
+    position: nodes[index].position,
+    externalSpaceId: nodes[index].external_space_id ?? '',
+    key: keyOf(wanted.space),
+  }));
   store.save();
   let changed = 0;
   for (const [index, wanted] of layout.entries()) {

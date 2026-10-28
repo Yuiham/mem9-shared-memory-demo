@@ -124,6 +124,30 @@ test('simulate reports the reason when the receiver refuses', async (t) => {
   assert.match(result.stderr, /\(503\): busy right now/);
 });
 
+test('simulate names the Team Shared node of the Leader\'s Chain in the event it sends', async (t) => {
+  const demo = await approvalDemo(t, { receiver: false });
+  const received = [];
+  const capture = http.createServer((request, response) => {
+    const chunks = [];
+    request.on('data', (chunk) => chunks.push(chunk));
+    request.on('end', () => {
+      received.push(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+      response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ candidates: [] }));
+    });
+  });
+  await new Promise((resolve) => capture.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => { capture.closeAllConnections(); capture.close(resolve); }));
+  fs.mkdirSync(path.dirname(demo.runtimeFile), { recursive: true });
+  fs.writeFileSync(demo.runtimeFile, JSON.stringify({ url: `http://127.0.0.1:${capture.address().port}`, pid: process.pid }));
+  const result = await simulate(demo, ['--leader', 'lucia', '--text', ANNOUNCEMENT]);
+  assert.equal(result.code, 0, result.output);
+  assert.equal(received.length, 1);
+  const teamNode = demo.h.fake.chainByName('sharedmem-demo-lucia').nodes.find((node) => node.external_space_id === 'team-shared');
+  assert.ok(teamNode?.id, 'the server has a Team Shared node on the Leader\'s Chain');
+  assert.equal(received[0].data.routing_policy_node_id, teamNode.id);
+  assert.equal(received[0].data.target_external_space_id, 'team-shared');
+});
+
 test('simulate never prints the signing secret', async (t) => {
   const demo = await approvalDemo(t);
   const result = await simulate(demo);

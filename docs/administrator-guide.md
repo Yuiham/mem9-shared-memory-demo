@@ -90,6 +90,7 @@ Before any server call it validates the cast, the Example and the length of ever
 
 - `--example basic|approval` chooses the Example. The first run defaults to Basic; a re-run without the flag keeps the recorded one.
 - Safe to re-run: what exists is reused. A Chain whose nodes already match keeps them, and only routing rules that differ are updated. A Chain the server no longer knows is created again on the same Spaces; its key changes, so export the Kits again.
+- The server does not show which Space a node points at, so `init` records the node ids and the mem9 API keys it wrote in `state/state.json` and compares against that record. A node replaced on the server by another tool, or a Space provisioned again under the same name, makes `init` set that Chain's nodes again. A state written by an earlier version has no record: the first `init` sets every Chain's nodes once and keeps the routing rules, and the run after that changes nothing.
 - Switching Examples changes one routing rule in place. Chains and keys stay the same, so Kits already handed out keep connecting. Run `export` again to refresh the Example label inside them.
 - It warns when you apply Approval with no webhook registered, because announcements would be lost.
 

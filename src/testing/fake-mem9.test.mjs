@@ -54,6 +54,84 @@ test('a chain keeps its nodes in order, and the owner node cannot take a routing
   assert.equal((await call('PUT', `/v1alpha2/space-chains/${chainId}/nodes/${nodes[1].id}/routing-policy`, { key, body: { enabled: true, prompt: 'ok' } })).status, 200);
 });
 
+// The server never returns a Space key on a read: a node carries no tenant_id, and a
+// Memory's chain_source names its node by position and external space id only.
+const leaksSpaceKey = (body, spaces) => {
+  const text = JSON.stringify(body);
+  return text.includes('tenant_id') || spaces.some((space) => text.includes(space));
+};
+
+// The shape the demo builds: the owner's Personal space has no external space id.
+async function personalAndTeam(call) {
+  const spaces = [];
+  for (let index = 0; index < 2; index += 1) spaces.push((await call('POST', '/v1alpha1/mem9s')).body.id);
+  const created = (await call('POST', '/v1alpha2/space-chains', { body: { name: 'demo' } })).body;
+  const key = created.chain_api_key;
+  const chainId = created.chain.id;
+  const set = await call('PUT', `/v1alpha2/space-chains/${chainId}/nodes`, {
+    key,
+    body: { nodes: [{ tenant_id: spaces[0], display_name: 'Personal' }, { tenant_id: spaces[1], external_space_id: 'team-shared', display_name: 'Team Shared' }] },
+  });
+  assert.equal(set.status, 200);
+  return { spaces, key, chainId, created, set, nodes: set.body.nodes };
+}
+
+test('no response carries a Space key, and a node leaves out the optional fields it has no value for', async (t) => {
+  const { call } = await startFake(t);
+  const { spaces, key, chainId, created, set, nodes: [owner, shared] } = await personalAndTeam(call);
+  await call('POST', '/v1alpha2/mem9s/memories', { key, header: 'sharedmem', body: { content: 'Ana prefers short answers.', memory_type: 'pinned', agent_id: 'ana' } });
+  await call('POST', '/v1alpha2/mem9s/memories', { key: spaces[1], header: 'sharedmem', body: { content: 'Releases go out on Tuesdays.', memory_type: 'pinned', agent_id: 'seed' } });
+  const listed = await call('GET', '/v1alpha2/mem9s/memories', { key });
+  const responses = {
+    'create chain': created,
+    'set nodes': set.body,
+    'read nodes': (await call('GET', `/v1alpha2/space-chains/${chainId}/nodes`, { key })).body,
+    'read chain': (await call('GET', `/v1alpha2/space-chains/${chainId}`, { key })).body,
+    'read chain by key': (await call('GET', '/v1alpha2/space-chains/by-key', { key })).body,
+    'set routing policy': (await call('PUT', `/v1alpha2/space-chains/${chainId}/nodes/${shared.id}/routing-policy`, { key, body: { enabled: true, prompt: 'team facts' } })).body,
+    'list memories': listed.body,
+  };
+  for (const [label, body] of Object.entries(responses)) assert.ok(!leaksSpaceKey(body, spaces), `${label} carries no Space key`);
+
+  assert.equal(owner.position, 0);
+  assert.equal(owner.display_name, 'Personal');
+  assert.ok(!('external_space_id' in owner), 'the owner node has no external space id, so the field is absent');
+  assert.ok(!('routing_policy_prompt' in owner), 'an empty prompt is absent');
+  assert.equal(shared.external_space_id, 'team-shared');
+
+  const sourceOf = (content) => listed.body.memories.find((memory) => memory.content === content).chain_source;
+  assert.deepEqual(sourceOf('Ana prefers short answers.'), { chain_id: chainId, node_position: 0 });
+  assert.deepEqual(sourceOf('Releases go out on Tuesdays.'), { chain_id: chainId, node_position: 1, external_space_id: 'team-shared' });
+});
+
+test('setting nodes still takes the Space key as tenant_id and refuses a missing, unknown or repeated one', async (t) => {
+  const { call } = await startFake(t);
+  const space = (await call('POST', '/v1alpha1/mem9s')).body.id;
+  const created = (await call('POST', '/v1alpha2/space-chains', { body: { name: 'demo' } })).body;
+  const put = (nodes) => call('PUT', `/v1alpha2/space-chains/${created.chain.id}/nodes`, { key: created.chain_api_key, body: { nodes } });
+  assert.equal((await put([{ display_name: 'Personal' }])).status, 400, 'missing');
+  assert.equal((await put([{ tenant_id: 'not-a-space' }])).status, 400, 'unknown');
+  assert.equal((await put([{ tenant_id: space }, { tenant_id: space, external_space_id: 'x' }])).status, 400, 'repeated');
+  assert.equal((await put([{ tenant_id: space }])).status, 200);
+});
+
+test('a routed fact names the source and target nodes by id and external space id, never by Space key', async (t) => {
+  const { fake, call } = await startFake(t);
+  const { key, spaces, chainId, nodes } = await personalAndTeam(call);
+  fake.setRouting({ rules: [{ match: /migrations/i, targets: ['team-shared'] }] });
+  await call('PUT', `/v1alpha2/space-chains/${chainId}/nodes/${nodes[1].id}/routing-policy`, { key, body: { enabled: true, prompt: 'team facts' } });
+  await call('POST', `/v1alpha2/space-chains/${chainId}/webhooks`, { key, body: { name: 'receiver', url: 'https://example.invalid/hook', events: ['space_chain.fact_routed'] } });
+  await call('POST', '/v1alpha2/mem9s/memories', { key, header: 'codex', body: { agent_id: 'ana', sync: true, messages: [{ role: 'user', content: 'Database migrations must be idempotent.' }] } });
+  assert.equal(fake.deliveries.length, 1);
+  const { data } = fake.deliveries[0].envelope;
+  assert.equal(data.source_node_id, nodes[0].id);
+  assert.equal(data.source_external_space_id, '', 'the owner node has no external space id; the event still carries the field');
+  assert.equal(data.target_external_space_id, 'team-shared');
+  assert.equal(data.routing_policy_node_id, nodes[1].id);
+  assert.ok(!('source_tenant_id' in data) && !('target_tenant_id' in data));
+  assert.ok(!leaksSpaceKey(fake.deliveries[0].envelope, spaces), 'the whole event carries no Space key');
+});
+
 test('a pinned write lands in the owner Space with the resolved agent id as source and actor', async (t) => {
   const { fake, call } = await startFake(t);
   const { key, spaces } = await chainOfThree(call);

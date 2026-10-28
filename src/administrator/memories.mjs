@@ -90,11 +90,14 @@ async function listAs({ ctx, person, types }) {
   if (!chain) {
     throw new CliError(`Unknown participant: ${person}.`, { next: `Use one of: ${state.participants.map((entry) => entry.name).join(', ')}.` });
   }
-  const spaceOf = new Map(Object.entries(state.spaces).map(([name, space]) => [space.key, name]));
+  // The first node of a Chain is always the owner's Personal space and has no external space
+  // id; every other node is named by its external space id.
   const sourceOf = (memory) => {
-    const name = spaceOf.get(memory.chain_source?.tenant_id);
-    if (!name) return memory.chain_source?.external_space_id || 'unknown';
-    return SHARED_SPACES.includes(name) ? displayName(name) : 'Personal';
+    const source = memory.chain_source;
+    if (source?.node_position === 0) return 'Personal';
+    const external = source?.external_space_id;
+    if (!external) return 'unknown';
+    return SHARED_SPACES.includes(external) ? displayName(external) : external;
   };
   const pages = [await mem9.listPage(chain.key)];
   if (!types.every((type) => LONG_TERM.includes(type))) pages.push(await mem9.listPage(chain.key, { memory_type: 'session' }));

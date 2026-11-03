@@ -11,9 +11,12 @@ const MEMORY_TYPES = ['pinned', 'insight', 'session'];
 const LONG_TERM = ['pinned', 'insight'];
 
 class HttpError extends Error {
-  constructor(status, message) {
+  // `headers` go on the response; `extra` is merged into the error body.
+  constructor(status, message, { headers = {}, extra = {} } = {}) {
     super(message);
     this.status = status;
+    this.headers = headers;
+    this.extra = extra;
   }
 }
 
@@ -41,6 +44,7 @@ export class FakeMem9 {
     // Chain key -> { chainId, role }. A chain has one management key and one memory key.
     this.keys = new Map();
     this.createSecret = null;
+    this.provisionLimit = null;
     this.createWithOneKey = false;
     this.requests = [];
     this.deliveries = [];
@@ -99,6 +103,13 @@ export class FakeMem9 {
   // Off by default; a server whose gate is off ignores the header.
   requireCreateSecret(secret) {
     this.createSecret = secret;
+  }
+
+  // Makes `rejectFirst` requests to open a Space answer 429 (the real server limits this
+  // call per source address), after `after` requests were accepted. `retryAfter` is the
+  // header value in seconds, or null to leave the header out.
+  limitProvisioning({ rejectFirst, retryAfter = 1, after = 0 }) {
+    this.provisionLimit = { skip: after, remaining: rejectFirst, retryAfter };
   }
 
   // Makes the create call answer like a server from before the two keys: one top-level
@@ -192,17 +203,17 @@ export class FakeMem9 {
       if (fault) return request.socket.destroy();
       this.#send(response, result.status, result.body);
     } catch (error) {
-      if (error instanceof HttpError) this.#send(response, error.status, { error: error.message });
+      if (error instanceof HttpError) this.#send(response, error.status, { error: error.message, ...error.extra }, error.headers);
       else throw error;
     }
   }
 
-  #send(response, status, body) {
+  #send(response, status, body, headers = {}) {
     if (status === 204) {
       response.writeHead(204).end();
       return;
     }
-    response.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(body));
+    response.writeHead(status, { 'Content-Type': 'application/json', ...headers }).end(JSON.stringify(body));
   }
 
   #roleOf(key) {
@@ -239,6 +250,17 @@ export class FakeMem9 {
   }
 
   #provision() {
+    // The real limiter answers before the handler runs, so a refused call opens nothing.
+    const limit = this.provisionLimit;
+    if (limit && limit.skip > 0) {
+      limit.skip -= 1;
+    } else if (limit && limit.remaining > 0) {
+      limit.remaining -= 1;
+      throw new HttpError(429, 'rate limit exceeded', {
+        headers: limit.retryAfter === null ? {} : { 'Retry-After': String(limit.retryAfter) },
+        extra: { code: 'local_rate_limited' },
+      });
+    }
     this.#countCreating();
     const id = hex(16);
     this.spaces.set(id, { id, memories: [] });

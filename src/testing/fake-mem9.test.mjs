@@ -20,7 +20,7 @@ async function startFake(t, options) {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const text = await response.text();
-    return { status: response.status, body: text ? JSON.parse(text) : null };
+    return { status: response.status, body: text ? JSON.parse(text) : null, headers: response.headers };
   };
   return { fake, call };
 }
@@ -106,6 +106,32 @@ test('the create gate asks for a Bearer secret only when a test turns it on', as
   assert.equal((await call('POST', '/v1alpha2/space-chains', { body: { name: 'gated' }, bearer: 'wrong' })).status, 401);
   assert.equal((await call('POST', '/v1alpha2/space-chains', { body: { name: 'gated' }, bearer: 'the-secret' })).status, 201);
   assert.equal(fake.chains.size, 3);
+});
+
+test('opening a Space can be rate limited with a Retry-After, then succeeds', async (t) => {
+  const { fake, call } = await startFake(t);
+  fake.limitProvisioning({ rejectFirst: 2, retryAfter: 3 });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const limited = await call('POST', '/v1alpha1/mem9s');
+    assert.equal(limited.status, 429);
+    assert.equal(limited.headers.get('retry-after'), '3');
+    assert.deepEqual(limited.body, { error: 'rate limit exceeded', code: 'local_rate_limited' });
+  }
+  assert.equal(fake.spaceIds().length, 0, 'a refused request opens nothing');
+  assert.equal((await call('POST', '/v1alpha1/mem9s')).status, 201);
+  assert.equal(fake.requestsTo('POST', '/v1alpha1/mem9s').length, 3);
+  fake.limitProvisioning({ rejectFirst: 1, retryAfter: null });
+  assert.equal((await call('POST', '/v1alpha1/mem9s')).headers.get('retry-after'), null, 'the header can be left out');
+});
+
+test('the limit can start only after some requests were accepted', async (t) => {
+  const { fake, call } = await startFake(t);
+  fake.limitProvisioning({ after: 2, rejectFirst: 1, retryAfter: 0 });
+  assert.equal((await call('POST', '/v1alpha1/mem9s')).status, 201);
+  assert.equal((await call('POST', '/v1alpha1/mem9s')).status, 201);
+  assert.equal((await call('POST', '/v1alpha1/mem9s')).status, 429);
+  assert.equal((await call('POST', '/v1alpha1/mem9s')).status, 201);
+  assert.equal(fake.spaceIds().length, 3);
 });
 
 test('a chain keeps its nodes in order, and the owner node cannot take a routing policy', async (t) => {

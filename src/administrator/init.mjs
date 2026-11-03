@@ -24,7 +24,9 @@ const HELP = {
     'On the server: provisions one Personal space per participant plus Team Shared and Leadership Shared, creates one Chain per participant, sets each Chain\'s nodes and routing policies, and writes the Seed memories that are not already there.',
     'A Chain is created through the mem9 Admin API when SHAREDMEM_ADMIN_API_URL, SHAREDMEM_ADMIN_API_KEY and SHAREDMEM_PROJECT_ID are all set (the hosted mem9 service uses this), and directly on the server otherwise (SHAREDMEM_CREATE_SECRET is sent if the server asks for one). Each Chain has a management key, which only the Administrator holds, and a memory key, which goes into the Kit.',
     'Locally: writes state/state.json (mode 600) and a backup next to it. The state holds every key, so keep it private.',
-    'Safe to re-run: what already exists is reused. Re-run with the other --example to switch Examples; the keys of a Chain do not change.',  ],
+    'Safe to re-run: what already exists is reused. Re-run with the other --example to switch Examples; the keys of a Chain do not change.',
+    'The server limits how fast Spaces can be opened: when it asks init to wait, init waits (up to a minute at a time, five retries per Space) and says so. If it still refuses, run init again later; it continues where it stopped.',
+  ],
   options: OPTIONS,
   examples: [
     'sharedmem-admin init                      # show the plan, then ask',
@@ -68,11 +70,39 @@ function describePlan({ participants, state, example, creation }) {
   ];
 }
 
+// The server limits how fast Spaces can be opened and answers 429 with the seconds to wait.
+// One Space is tried again up to RETRIES times; a wait longer than LONGEST_WAIT, or one more
+// refusal after the last retry, stops init. Spaces opened so far are already in the state, so
+// the next run continues from there.
+const RETRIES = 5;
+const LONGEST_WAIT = 60;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const RERUN = 'Run `sharedmem-admin init` again later; it continues where it stopped.';
+
+async function openSpace({ mem9, io }) {
+  for (let retry = 0; ; retry += 1) {
+    try {
+      return await mem9.provisionSpace();
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 429) throw error;
+      const seconds = Math.max(1, error.retryAfter ?? 1);
+      if (seconds > LONGEST_WAIT) {
+        throw new CliError(`The server is limiting how fast Spaces can be opened and asked for a wait of ${seconds} seconds, which is too long to wait here.`, { next: RERUN });
+      }
+      if (retry === RETRIES) {
+        throw new CliError(`The server is still limiting how fast Spaces can be opened after ${RETRIES} retries.`, { next: RERUN });
+      }
+      io.out(`  the server limits how fast Spaces can be opened; waiting ${seconds}s before trying again (retry ${retry + 1} of ${RETRIES})`);
+      await sleep(seconds * 1000);
+    }
+  }
+}
+
 async function provisionSpaces({ ctx, participants }) {
   const { store, mem9, io } = ctx;
   for (const name of [...participants.map((person) => person.name), ...SHARED_SPACES]) {
     if (store.state.spaces[name]) continue;
-    const key = await mem9.provisionSpace();
+    const key = await openSpace({ mem9, io });
     store.state.spaces[name] = { key };
     store.save();
     io.out(`  provisioned ${SHARED_SPACES.includes(name) ? displayName(name) : `the Personal space of ${name}`}`);

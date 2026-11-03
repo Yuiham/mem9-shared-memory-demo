@@ -311,3 +311,79 @@ test('a server that still answers with one Chain key is reported as too old, and
   assert.deepEqual(h.readState().chains, {});
   for (const key of h.fake.keys.keys()) assert.ok(!result.output.includes(key), 'a key from the answer was printed');
 });
+
+// ---- a server that limits how fast Spaces can be opened --------------------------------------------------
+
+const provisionCalls = (h) => h.fake.requestsTo('POST', '/v1alpha1/mem9s').length;
+const WAIT_LINE = (seconds, retry) => new RegExp(`the server limits how fast Spaces can be opened; waiting ${seconds}s before trying again \\(retry ${retry} of 5\\)`);
+
+test('when the server answers 429 to opening a Space, init waits the seconds it asked for, says so, and goes on', async (t) => {
+  const h = await withHarness(t);
+  h.fake.limitProvisioning({ rejectFirst: 2, retryAfter: 1 });
+  const started = Date.now();
+  const result = await init(h);
+  const seconds = (Date.now() - started) / 1000;
+  assert.equal(result.code, 0, result.output);
+  assert.match(result.stdout, WAIT_LINE(1, 1));
+  assert.match(result.stdout, WAIT_LINE(1, 2));
+  assert.equal(occurrences(result.stdout, 'waiting 1s'), 2);
+  assert.ok(seconds >= 1.8, `init waited for the two refusals (${seconds}s)`);
+  assert.equal(provisionCalls(h), 6, 'four Spaces and two refused attempts');
+  assert.equal(Object.keys(h.readState().spaces).length, 4);
+  assertNoLeak(h, [result.output]);
+});
+
+test('init waits the number of seconds the server names, not a fixed one', async (t) => {
+  const h = await withHarness(t);
+  h.fake.limitProvisioning({ rejectFirst: 1, retryAfter: 2 });
+  const started = Date.now();
+  const result = await init(h);
+  const seconds = (Date.now() - started) / 1000;
+  assert.equal(result.code, 0, result.output);
+  assert.match(result.stdout, WAIT_LINE(2, 1));
+  assert.ok(seconds >= 1.8, `init waited the two seconds it was asked for (${seconds}s)`);
+});
+
+test('a 429 without a Retry-After header is waited out as one second', async (t) => {
+  const h = await withHarness(t);
+  h.fake.limitProvisioning({ rejectFirst: 1, retryAfter: null });
+  const result = await init(h);
+  assert.equal(result.code, 0, result.output);
+  assert.match(result.stdout, WAIT_LINE(1, 1));
+});
+
+test('a server that keeps refusing stops init after five retries, keeps the Spaces already opened, and a later run goes on from there', async (t) => {
+  const h = await withHarness(t);
+  h.fake.limitProvisioning({ rejectFirst: 100, retryAfter: 1, after: 2 });
+  const stopped = await init(h);
+  assert.equal(stopped.code, 1, stopped.output);
+  for (const retry of [1, 2, 3, 4, 5]) assert.match(stopped.stdout, WAIT_LINE(1, retry));
+  assert.doesNotMatch(stopped.stdout, /retry 6 of 5/);
+  assert.match(stopped.stderr, /error: The server is still limiting how fast Spaces can be opened after 5 retries\./);
+  assert.match(stopped.stderr, /next: Run `sharedmem-admin init` again later; it continues where it stopped\./);
+  assert.equal(provisionCalls(h), 8, 'two Spaces, then the sixth refusal of the third');
+  assert.equal(Object.keys(h.readState().spaces).length, 2, 'the Spaces opened before are kept');
+  assert.equal(h.fake.chains.size, 0);
+  assertNoLeak(h, [stopped.output]);
+
+  h.fake.limitProvisioning({ rejectFirst: 0 });
+  const resumed = await init(h);
+  assert.equal(resumed.code, 0, resumed.output);
+  assert.equal(Object.keys(h.readState().spaces).length, 4);
+  assert.equal(provisionCalls(h), 10, 'only the two missing Spaces were opened');
+});
+
+test('a Retry-After longer than a minute stops init at once instead of waiting', async (t) => {
+  const h = await withHarness(t);
+  h.fake.limitProvisioning({ rejectFirst: 1, retryAfter: 61, after: 1 });
+  const started = Date.now();
+  const result = await init(h);
+  assert.ok(Date.now() - started < 5000, 'init did not wait');
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.stderr, /error: The server is limiting how fast Spaces can be opened and asked for a wait of 61 seconds, which is too long to wait here\./);
+  assert.match(result.stderr, /next: Run `sharedmem-admin init` again later; it continues where it stopped\./);
+  assert.doesNotMatch(result.stdout, /waiting/);
+  assert.equal(provisionCalls(h), 2);
+  assert.equal(Object.keys(h.readState().spaces).length, 1);
+  assertNoLeak(h, [result.output]);
+});

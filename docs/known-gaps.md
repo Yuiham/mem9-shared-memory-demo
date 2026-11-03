@@ -67,7 +67,10 @@ What the demo does not do, or cannot guarantee. Read this before showing it to a
 22. **The server cannot list or delete Spaces.**
     - The local state is the only record, and Spaces remain after `teardown`.
     - Losing the state means the next `init` creates new Spaces and Chains, and the old ones stay on the server unused.
-23. **A change may take a few minutes to show on the server.**
+23. **The server limits how fast Spaces can be opened.**
+    - `init` waits as long as the server asks, at most a minute at a time and five retries per Space, and prints one line for each wait. A cast of six people needs eight Spaces, so on a server with the default limit `init` can take a few minutes.
+    - If the server still refuses, `init` stops. Run it again later: the Spaces already opened are recorded, and it continues where it stopped.
+24. **A change may take a few minutes to show on the server.**
     - In one run, right after switching to the Approval Example and registering a webhook, `verify` found no routed-fact delivery for the two announcement Cases for about three minutes. About six minutes after the switch both passed. The cause was not established.
     - If `verify` fails right after `init` or `webhook set`, wait a few minutes and run it again before changing a prompt.
-24. **The demo does not change the server or the plugins**, and it does not support Windows, graphical interfaces or languages other than English in its documentation.
+25. **The demo does not change the server or the plugins**, and it does not support Windows, graphical interfaces or languages other than English in its documentation.

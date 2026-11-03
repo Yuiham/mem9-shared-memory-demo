@@ -89,7 +89,7 @@ cp .env.example .env          # set SHAREDMEM_API_URL in .env to your server (gi
 - the three Routing prompts, from `config/routing-prompts/`;
 - a few Seed memories for the sample questions to find.
 
-It shows its plan and asks before it changes anything. It takes a minute or two.
+It shows its plan and asks before it changes anything. Under the server's default limit on how fast Spaces can be opened it takes a few minutes: `init` waits as long as the server asks and says so.
 
 ### 2. Check the routing (Administrator)
 

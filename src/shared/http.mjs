@@ -3,17 +3,24 @@
 import { CliError } from './cli.mjs';
 
 export class ApiError extends Error {
-  constructor(status, message, where) {
+  // `retryAfter` is the number of seconds a 429 answer asks to wait, when it says so.
+  constructor(status, message, where, { retryAfter = null } = {}) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.where = where;
+    this.retryAfter = retryAfter;
   }
 }
 
 // Turns a server answer that no command expected into an error with a next step.
 export function toCliError(error) {
   const what = `${error.where} (${error.status}): ${error.message}`;
+  if (error.status === 429) {
+    return new CliError(`The mem9 server is limiting requests: ${what}`, {
+      next: 'Wait a minute, then run the command again. Commands that create things pick up where they stopped.',
+    });
+  }
   if (error.status >= 500) {
     return new CliError(`The mem9 server failed during ${what}`, {
       next: 'Run the command again. Commands that create things pick up where they stopped.',
@@ -88,7 +95,8 @@ export function createApiClient(baseUrl, { toolName = 'sharedmem', identify = tr
       // The mem9 server answers `{ error }`, the Admin API `{ code, message, details }`.
       const stated = [json?.error, json?.message].find((value) => typeof value === 'string' && value !== '');
       const message = (stated ?? text.slice(0, 200)) || `HTTP ${response.status}`;
-      throw new ApiError(response.status, message, `${method} ${path.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, '<id>')}`);
+      const seconds = /^\d+$/.test(response.headers.get('retry-after') ?? '') ? Number(response.headers.get('retry-after')) : null;
+      throw new ApiError(response.status, message, `${method} ${path.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, '<id>')}`, { retryAfter: response.status === 429 ? seconds : null });
     }
     return json;
   }

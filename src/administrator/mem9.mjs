@@ -14,6 +14,8 @@ export function createMem9(api) {
     return { memories: body?.memories ?? [], total: body?.total ?? 0 };
   }
   return {
+    // One attempt: a server that limits how fast Spaces are opened answers 429, and the
+    // error says how long to wait. Waiting and trying again is the caller's decision.
     async provisionSpace() {
       return (await api.request('POST', '/v1alpha1/mem9s')).id;
     },

@@ -2,7 +2,7 @@
 
 This Kit connects your coding agent (Claude Code or Codex) to your own shared-memory Chain, so you can see what your agent shares with your team and what stays private.
 
-**This folder is a secret.** The file `person.json` holds your chain API key. Do not post it, commit it or forward it. Anyone who has it can read and write what your Chain can reach.
+**This folder is a secret.** The file `person.json` holds your memory key. Do not post it, commit it or forward it. Anyone who has it can read and write what your Chain can reach.
 
 ## Before you start
 

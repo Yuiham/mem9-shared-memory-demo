@@ -100,12 +100,39 @@ test('no file in the repository holds a real address, a home-directory path or a
     assert.doesNotMatch(text, /\/(?:Users|home)\/[A-Za-z0-9._-]+\//, `${file} holds an absolute home-directory path`);
     if (!file.endsWith('.test.mjs') && !file.includes('.support.')) {
       assert.doesNotMatch(text, /\bchain_[0-9a-f]{20,}/, `${file} holds a chain key`);
+      assert.doesNotMatch(text, /\bmem9_admin_[A-Za-z0-9]{20,}/, `${file} holds an Admin API key`);
       assert.doesNotMatch(text, /\bwhsec_[A-Za-z0-9_-]{20,}/, `${file} holds a signing secret`);
       assert.doesNotMatch(text, /\b[0-9a-f]{32}\b/, `${file} holds a key-shaped value`);
     }
   }
 });
 
-test('the committed example environment file holds a placeholder, not an address', () => {
-  assert.match(read('.env.example'), /SHAREDMEM_API_URL=https:\/\/mem9\.example\.com\s*$/m);
+// The hosted service's public addresses may be named, as examples. Nothing else under mem9.ai
+// may, and a plain-HTTP address is only ever this computer or a made-up example.
+const PUBLIC_HOSTS = new Set(['api.mem9.ai', 'mem9.ai', 'console-api.mem9.ai']);
+const THIS_COMPUTER = new Set(['127.0.0.1', 'localhost', '[::1]', 'fake.local']);
+const MADE_UP = (hostname) => hostname === 'example.com' || hostname.endsWith('.example.com') || hostname.endsWith('.invalid');
+
+test('addresses in the repository: plain HTTP only for this computer or a made-up host, and only the three public mem9.ai hosts', () => {
+  for (const file of repositoryFiles().filter((name) => name !== 'LICENSE')) {
+    for (const [address] of read(file).matchAll(/\bhttps?:\/\/(?=[A-Za-z0-9[])[A-Za-z0-9.[\]:@-]+/g)) {
+      const { protocol, hostname } = new URL(address);
+      if (protocol === 'http:') {
+        assert.ok(THIS_COMPUTER.has(hostname) || MADE_UP(hostname), `${file} names the plain-HTTP address ${address}`);
+      }
+      if (hostname === 'mem9.ai' || hostname.endsWith('.mem9.ai')) {
+        assert.ok(PUBLIC_HOSTS.has(hostname), `${file} names the host ${hostname}, which is not one of the three public ones`);
+      }
+    }
+  }
+});
+
+test('the committed example environment file sets only a placeholder address; the hosted service and the create secret appear in comments', () => {
+  const text = read('.env.example');
+  assert.match(text, /^SHAREDMEM_API_URL=https:\/\/mem9\.example\.com\s*$/m);
+  const live = text.split('\n').filter((line) => line.trim() !== '' && !line.startsWith('#'));
+  assert.deepEqual(live, ['SHAREDMEM_API_URL=https://mem9.example.com'], 'no other setting is live');
+  for (const name of ['SHAREDMEM_ADMIN_API_URL', 'SHAREDMEM_ADMIN_API_KEY', 'SHAREDMEM_PROJECT_ID', 'SHAREDMEM_CREATE_SECRET']) {
+    assert.match(text, new RegExp(`^# ${name}=`, 'm'), `${name} is shown as a comment`);
+  }
 });

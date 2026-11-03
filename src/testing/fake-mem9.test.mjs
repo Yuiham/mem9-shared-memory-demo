@@ -8,10 +8,15 @@ import { FakeMem9 } from './fake-mem9.support.mjs';
 async function startFake(t, options) {
   const fake = await new FakeMem9(options).start();
   t.after(() => fake.stop());
-  const call = async (method, path, { key, body, header } = {}) => {
+  const call = async (method, path, { key, body, header, bearer } = {}) => {
     const response = await fetch(`${fake.url}${path}`, {
       method,
-      headers: { 'Content-Type': 'application/json', ...(key ? { 'X-API-Key': key } : {}), ...(header ? { 'X-Mnemo-Agent-Id': header } : {}) },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(key ? { 'X-API-Key': key } : {}),
+        ...(header ? { 'X-Mnemo-Agent-Id': header } : {}),
+        ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
+      },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const text = await response.text();
@@ -24,7 +29,7 @@ async function chainOfThree(call) {
   const spaces = [];
   for (let index = 0; index < 3; index += 1) spaces.push((await call('POST', '/v1alpha1/mem9s')).body.id);
   const created = (await call('POST', '/v1alpha2/space-chains', { body: { name: 'demo' } })).body;
-  const key = created.chain_api_key;
+  const key = created.management_binding.chain_api_key;
   const nodes = (await call('PUT', `/v1alpha2/space-chains/${created.chain.id}/nodes`, {
     key,
     body: { nodes: [
@@ -33,7 +38,7 @@ async function chainOfThree(call) {
       { tenant_id: spaces[2], external_space_id: 'leadership-shared', display_name: 'leadership' },
     ] },
   })).body.nodes;
-  return { spaces, key, chainId: created.chain.id, nodes };
+  return { spaces, key, memoryKey: created.memory_binding.chain_api_key, chainId: created.chain.id, nodes };
 }
 
 test('provisioning creates a Space that answers status; unknown keys are not found', async (t) => {
@@ -42,6 +47,65 @@ test('provisioning creates a Space that answers status; unknown keys are not fou
   assert.deepEqual((await call('GET', '/v1alpha2/status', { key: id })).body, { status: 'active' });
   assert.equal((await call('GET', '/v1alpha2/status', { key: 'nope' })).status, 404);
   assert.equal((await call('GET', '/v1alpha2/status')).status, 401);
+});
+
+test('creating a chain returns the chain and two bindings, one management and one memory, and no top-level key', async (t) => {
+  const { call } = await startFake(t);
+  const created = (await call('POST', '/v1alpha2/space-chains', { body: { name: 'demo', description: 'd' } })).body;
+  assert.deepEqual(Object.keys(created).sort(), ['chain', 'management_binding', 'memory_binding']);
+  assert.equal(created.chain.name, 'demo');
+  assert.equal(created.management_binding.role, 'management');
+  assert.equal(created.memory_binding.role, 'memory');
+  assert.notEqual(created.management_binding.id, created.memory_binding.id);
+  const [management, memory] = [created.management_binding.chain_api_key, created.memory_binding.chain_api_key];
+  assert.match(management, /^chain_/);
+  assert.match(memory, /^chain_/);
+  assert.notEqual(management, memory);
+});
+
+test('a management route takes only the management key: a memory key is refused (401), an unknown key is not found', async (t) => {
+  const { call } = await startFake(t);
+  const { key, memoryKey, chainId } = await chainOfThree(call);
+  const routes = [
+    ['GET', '/v1alpha2/space-chains/by-key'],
+    ['GET', `/v1alpha2/space-chains/${chainId}`],
+    ['GET', `/v1alpha2/space-chains/${chainId}/nodes`],
+    ['PUT', `/v1alpha2/space-chains/${chainId}/nodes`, { nodes: [] }],
+    ['POST', `/v1alpha2/space-chains/${chainId}/webhooks`, { name: 'x', url: 'https://example.invalid/hook', events: ['space_chain.fact_routed'] }],
+    ['GET', `/v1alpha2/space-chains/${chainId}/webhook-deliveries`],
+    ['DELETE', `/v1alpha2/space-chains/${chainId}`],
+  ];
+  for (const [method, path, body] of routes) {
+    const refused = await call(method, path, { key: memoryKey, body });
+    assert.equal(refused.status, 401, `${method} ${path} with the memory key`);
+    assert.deepEqual(refused.body, { error: 'a Space Chain management key is required' });
+    assert.equal((await call(method, path, { key: 'chain_unknown', body })).status, 404, `${method} ${path} with an unknown key`);
+  }
+  assert.equal((await call('GET', '/v1alpha2/space-chains/by-key', { key })).status, 200, 'the management key still works');
+});
+
+test('a memory route takes both keys, and the request log records which role the key had', async (t) => {
+  const { fake, call } = await startFake(t);
+  const { key, memoryKey, spaces } = await chainOfThree(call);
+  assert.equal((await call('POST', '/v1alpha2/mem9s/memories', { key: memoryKey, header: 'sharedmem', body: { content: 'Written with the memory key.', memory_type: 'pinned', agent_id: 'ana' } })).status, 201);
+  assert.equal((await call('GET', '/v1alpha2/mem9s/memories', { key })).body.memories.length, 1, 'the management key reads what the memory key wrote');
+  assert.equal(fake.memoriesIn(spaces[0], { type: 'pinned' }).length, 1);
+  await call('GET', '/v1alpha2/mem9s/memories', { key: spaces[0] });
+  assert.deepEqual(fake.requests.filter((request) => request.path === '/v1alpha2/mem9s/memories').map((request) => request.role), ['memory', 'management', 'space']);
+  assert.equal(fake.requests[0].role, null, 'a request without a chain key has no role');
+});
+
+test('the create gate asks for a Bearer secret only when a test turns it on', async (t) => {
+  const { fake, call } = await startFake(t);
+  assert.equal((await call('POST', '/v1alpha2/space-chains', { body: { name: 'open' } })).status, 201, 'off by default');
+  assert.equal((await call('POST', '/v1alpha2/space-chains', { body: { name: 'open-with-secret' }, bearer: 'anything' })).status, 201, 'a server whose gate is off ignores the header');
+  fake.requireCreateSecret('the-secret');
+  const refused = await call('POST', '/v1alpha2/space-chains', { body: { name: 'gated' } });
+  assert.equal(refused.status, 401);
+  assert.deepEqual(refused.body, { error: 'missing or invalid Authorization bearer token' });
+  assert.equal((await call('POST', '/v1alpha2/space-chains', { body: { name: 'gated' }, bearer: 'wrong' })).status, 401);
+  assert.equal((await call('POST', '/v1alpha2/space-chains', { body: { name: 'gated' }, bearer: 'the-secret' })).status, 201);
+  assert.equal(fake.chains.size, 3);
 });
 
 test('a chain keeps its nodes in order, and the owner node cannot take a routing policy', async (t) => {
@@ -66,14 +130,14 @@ async function personalAndTeam(call) {
   const spaces = [];
   for (let index = 0; index < 2; index += 1) spaces.push((await call('POST', '/v1alpha1/mem9s')).body.id);
   const created = (await call('POST', '/v1alpha2/space-chains', { body: { name: 'demo' } })).body;
-  const key = created.chain_api_key;
+  const key = created.management_binding.chain_api_key;
   const chainId = created.chain.id;
   const set = await call('PUT', `/v1alpha2/space-chains/${chainId}/nodes`, {
     key,
     body: { nodes: [{ tenant_id: spaces[0], display_name: 'Personal' }, { tenant_id: spaces[1], external_space_id: 'team-shared', display_name: 'Team Shared' }] },
   });
   assert.equal(set.status, 200);
-  return { spaces, key, chainId, created, set, nodes: set.body.nodes };
+  return { spaces, key, memoryKey: created.memory_binding.chain_api_key, chainId, created, set, nodes: set.body.nodes };
 }
 
 test('no response carries a Space key, and a node leaves out the optional fields it has no value for', async (t) => {
@@ -108,7 +172,7 @@ test('setting nodes still takes the Space key as tenant_id and refuses a missing
   const { call } = await startFake(t);
   const space = (await call('POST', '/v1alpha1/mem9s')).body.id;
   const created = (await call('POST', '/v1alpha2/space-chains', { body: { name: 'demo' } })).body;
-  const put = (nodes) => call('PUT', `/v1alpha2/space-chains/${created.chain.id}/nodes`, { key: created.chain_api_key, body: { nodes } });
+  const put = (nodes) => call('PUT', `/v1alpha2/space-chains/${created.chain.id}/nodes`, { key: created.management_binding.chain_api_key, body: { nodes } });
   assert.equal((await put([{ display_name: 'Personal' }])).status, 400, 'missing');
   assert.equal((await put([{ tenant_id: 'not-a-space' }])).status, 400, 'unknown');
   assert.equal((await put([{ tenant_id: space }, { tenant_id: space, external_space_id: 'x' }])).status, 400, 'repeated');

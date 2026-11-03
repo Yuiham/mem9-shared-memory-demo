@@ -5,7 +5,8 @@ export function maskKey(value) {
   return `${prefix ? prefix[1] : ''}****${value.slice(-4)}`;
 }
 
-const GENERIC = /\b(?:chain_|whsec_)[A-Za-z0-9_-]{8,}/g;
+// Keys by their shape, so one that was never registered (an echo from a server) is masked too.
+const GENERIC = /\b(?:chain_|whsec_|mem9_admin_)[A-Za-z0-9_-]{8,}/g;
 
 export class Redactor {
   constructor() {
@@ -17,9 +18,8 @@ export class Redactor {
     this.#add(value, maskKey(value));
   }
 
-  addAddress(address) {
+  addAddress(address, mask = '<server-address>') {
     if (typeof address !== 'string' || !address) return;
-    const mask = '<server-address>';
     this.#add(address, mask);
     this.#add(address.replace(/\/+$/, ''), mask);
     try {

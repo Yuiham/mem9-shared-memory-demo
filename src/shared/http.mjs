@@ -1,4 +1,5 @@
-// A small JSON client for the mem9 server, built on the fetch that ships with Node.
+// A small JSON client for the mem9 server and the mem9 Admin API, built on the fetch that
+// ships with Node.
 import { CliError } from './cli.mjs';
 
 export class ApiError extends Error {
@@ -35,17 +36,23 @@ const RETRIES = 2;
 const RETRY_DELAY_MS = 300;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export function createApiClient(baseUrl, { toolName = 'sharedmem' } = {}) {
+// `identify: false` leaves out the tool header, which only the mem9 server reads. `label` and
+// `addressVariable` say which service this client talks to, for the message when it cannot
+// be reached.
+export function createApiClient(baseUrl, { toolName = 'sharedmem', identify = true, label = 'mem9 server', addressVariable = 'SHAREDMEM_API_URL' } = {}) {
   // `retry` marks a request that can be repeated without a second effect; reads always can.
-  async function request(method, path, { key, body, query, timeoutMs = 30000, retry = method === 'GET' } = {}) {
+  // `key` goes in the X-API-Key header (mem9 keys); `bearer` in an Authorization header
+  // (the create secret, an Admin API key).
+  async function request(method, path, { key, bearer, body, query, timeoutMs = 30000, retry = method === 'GET' } = {}) {
     const url = new URL(baseUrl + path);
     for (const [name, value] of Object.entries(query ?? {})) {
       if (value !== undefined && value !== null && value !== '') url.searchParams.set(name, String(value));
     }
     // The header names the writing tool. People are identified by the agent_id in
     // request bodies, never by this header.
-    const headers = { 'X-Mnemo-Agent-Id': toolName };
+    const headers = identify ? { 'X-Mnemo-Agent-Id': toolName } : {};
     if (key) headers['X-API-Key'] = key;
+    if (bearer) headers.Authorization = `Bearer ${bearer}`;
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     let response;
     for (let attempt = 0; ; attempt += 1) {
@@ -63,8 +70,8 @@ export function createApiClient(baseUrl, { toolName = 'sharedmem' } = {}) {
           continue;
         }
         const reason = error?.name === 'TimeoutError' ? 'it did not answer in time' : (error?.cause?.code ?? 'connection failed');
-        throw new CliError(`Cannot reach the mem9 server (${reason}).`, {
-          next: 'Check SHAREDMEM_API_URL and your network connection, then run the command again.',
+        throw new CliError(`Cannot reach the ${label} (${reason}).`, {
+          next: `Check ${addressVariable} and your network connection, then run the command again.`,
         });
       }
     }
@@ -78,7 +85,9 @@ export function createApiClient(baseUrl, { toolName = 'sharedmem' } = {}) {
       }
     }
     if (!response.ok) {
-      const message = (json && typeof json.error === 'string' ? json.error : text.slice(0, 200)) || `HTTP ${response.status}`;
+      // The mem9 server answers `{ error }`, the Admin API `{ code, message, details }`.
+      const stated = [json?.error, json?.message].find((value) => typeof value === 'string' && value !== '');
+      const message = (stated ?? text.slice(0, 200)) || `HTTP ${response.status}`;
       throw new ApiError(response.status, message, `${method} ${path.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, '<id>')}`);
     }
     return json;

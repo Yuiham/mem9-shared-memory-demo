@@ -22,9 +22,9 @@ const HELP = {
   summary: 'Creates (or reuses) the Spaces and Chains for the cast, applies the Routing prompts and the chosen Example, and writes the Seed memories.',
   changes: [
     'On the server: provisions one Personal space per participant plus Team Shared and Leadership Shared, creates one Chain per participant, sets each Chain\'s nodes and routing policies, and writes the Seed memories that are not already there.',
+    'A Chain is created through the mem9 Admin API when SHAREDMEM_ADMIN_API_URL, SHAREDMEM_ADMIN_API_KEY and SHAREDMEM_PROJECT_ID are all set (the hosted mem9 service uses this), and directly on the server otherwise (SHAREDMEM_CREATE_SECRET is sent if the server asks for one). Each Chain has a management key, which only the Administrator holds, and a memory key, which goes into the Kit.',
     'Locally: writes state/state.json (mode 600) and a backup next to it. The state holds every key, so keep it private.',
-    'Safe to re-run: what already exists is reused. Re-run with the other --example to switch Examples; chain keys do not change.',
-  ],
+    'Safe to re-run: what already exists is reused. Re-run with the other --example to switch Examples; the keys of a Chain do not change.',  ],
   options: OPTIONS,
   examples: [
     'sharedmem-admin init                      # show the plan, then ask',
@@ -50,17 +50,19 @@ function checkCastAgainstState(participants, state) {
   }
 }
 
-function describePlan({ participants, state, example }) {
+function describePlan({ participants, state, example, creation }) {
   const spaces = [...participants.map((person) => person.name), ...SHARED_SPACES];
   const toCreate = spaces.filter((name) => !state?.spaces?.[name]);
   const chainsToCreate = participants.filter((person) => !state?.chains?.[person.name]);
   const recorded = state?.example;
   const exampleText = !recorded ? `${example} (first run)` : recorded === example ? `${example} (unchanged)` : `${example} (switching from ${recorded})`;
+  // A recorded Chain that the server has forgotten is created again later, the same way.
+  const how = chainsToCreate.length > 0 ? ` (${creation})` : '';
   return [
     'Plan:',
     `  - Example: ${exampleText}.`,
     `  - ${plural(spaces.length, 'Space')} in total (${participants.length} Personal, 2 Shared); ${toCreate.length} still to create.`,
-    `  - ${plural(participants.length, 'Chain')} in total; ${chainsToCreate.length} still to create. Nodes and routing policies are checked on the server and only differences are changed.`,
+    `  - ${plural(participants.length, 'Chain')} in total; ${chainsToCreate.length} still to create${how}. Nodes and routing policies are checked on the server and only differences are changed.`,
     `  - Seed memories are written to Team Shared and Leadership Shared when they are not already there.`,
     '  - Local files: state/state.json and its backup in the working directory.',
   ];
@@ -79,9 +81,9 @@ async function provisionSpaces({ ctx, participants }) {
 
 // Returns true when the registered webhook of an earlier Chain was lost with it.
 async function createChain({ ctx, person }) {
-  const { store, mem9 } = ctx;
-  const created = await mem9.createChain(chainNameFor(person.name), `Shared-memory demo Chain for ${person.name}`);
-  store.state.chains[person.name] = { id: created.chain.id, name: created.chain.name, key: created.chain_api_key, nodes: [] };
+  const { store, chainMaker } = ctx;
+  const { id, name, origin, managementKey, memoryKey } = await chainMaker.create(chainNameFor(person.name), `Shared-memory demo Chain for ${person.name}`);
+  store.state.chains[person.name] = { id, name, origin, managementKey, memoryKey, nodes: [] };
   // A webhook belongs to the old Chain; the new one has none.
   const lostWebhook = Boolean(store.state.webhooks[person.name]);
   delete store.state.webhooks[person.name];
@@ -94,12 +96,12 @@ async function configureChain({ ctx, person, example, prompts, created }) {
   const { state } = store;
   let known = null;
   try {
-    known = await mem9.chainByKey(state.chains[person.name].key);
+    known = await mem9.chainByKey(state.chains[person.name].managementKey);
   } catch (error) {
     if (!(error instanceof ApiError) || error.status !== 404) throw error;
     const lostWebhook = await createChain({ ctx, person });
     created.push(person.name);
-    io.out(`  the server no longer knows the Chain of ${person.name}; a new Chain was created again on the same Spaces (its key changed, so export the Kits again)`);
+    io.out(`  the server no longer knows the Chain of ${person.name}; a new Chain was created again on the same Spaces (its keys changed, so export the Kits again)`);
     if (lostWebhook) {
       io.warnOnce(`webhook-lost-${person.name}`, `The webhook registered on the old Chain of ${person.name} is gone with it. Run \`sharedmem-admin webhook set\` again to register one on the new Chain (the Approval Example needs it).`);
     }
@@ -174,13 +176,13 @@ export async function run(argv, { io, env, program }) {
   for (const seed of seeds) {
     if (!SHARED_SPACES.includes(seed.space)) throw new CliError(`Seed memory ${seed.id} names an unknown Space: ${seed.space}.`, { next: 'Use team-shared or leadership-shared in config/seed-memories.json.' });
   }
-  const ctx = openContext({ io, env, workdirFlag: values.workdir });
+  const ctx = openContext({ io, env, workdirFlag: values.workdir, creation: true });
   const { store } = ctx;
   const participants = cast.participants.map(({ name, role }) => ({ name, role }));
   checkCastAgainstState(participants, store.state);
   const example = values.example ?? store.state?.example ?? 'basic';
 
-  io.out(describePlan({ participants, state: store.state, example }).join('\n'));
+  io.out(describePlan({ participants, state: store.state, example, creation: ctx.chainMaker.describe }).join('\n'));
   if (example === 'approval' && !Object.keys(store.state?.webhooks ?? {}).length) {
     io.warnOnce('approval-no-webhook', 'The Approval Example is being applied but no webhook is registered, so announcements will be lost until you run `sharedmem-admin webhook set`.');
   }

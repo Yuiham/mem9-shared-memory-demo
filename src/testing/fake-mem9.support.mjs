@@ -38,7 +38,10 @@ export class FakeMem9 {
     this.options = { allowHttpLocalhost, asyncDelayMs };
     this.spaces = new Map();
     this.chains = new Map();
+    // Chain key -> { chainId, role }. A chain has one management key and one memory key.
     this.keys = new Map();
+    this.createSecret = null;
+    this.createWithOneKey = false;
     this.requests = [];
     this.deliveries = [];
     this.routing = { extract: () => true, route: () => [] };
@@ -90,6 +93,24 @@ export class FakeMem9 {
 
   failRoutingTo(externalSpaceId) {
     this.failTargets.add(externalSpaceId);
+  }
+
+  // Turns the create gate on: creating a Chain then needs `Authorization: Bearer <secret>`.
+  // Off by default; a server whose gate is off ignores the header.
+  requireCreateSecret(secret) {
+    this.createSecret = secret;
+  }
+
+  // Makes the create call answer like a server from before the two keys: one top-level
+  // `chain_api_key`, which works as the management key, and no bindings.
+  answerCreateWithOneKey() {
+    this.createWithOneKey = true;
+  }
+
+  // What the Console does when it creates a Chain for an Admin API request: the Chain
+  // is created without the gate. Returns the same JSON the create endpoint returns.
+  createChainForConsole(name, description = '') {
+    return this.#newChain(name, description);
   }
 
   injectFailure({ after }) {
@@ -160,12 +181,14 @@ export class FakeMem9 {
     }
     const key = request.headers['x-api-key'];
     const header = request.headers['x-mnemo-agent-id'] ?? '';
-    this.requests.push({ method: request.method, path: url.pathname, query: Object.fromEntries(url.searchParams), body, key, header });
+    const authorization = request.headers.authorization;
+    // `role` says what the key was: a chain's management or memory key, a Space key, or null.
+    this.requests.push({ method: request.method, path: url.pathname, query: Object.fromEntries(url.searchParams), body, key, header, authorization, role: this.#roleOf(key) });
     const fault = this.faults.find((entry) => entry.count > 0 && entry.method === request.method && (entry.path instanceof RegExp ? entry.path.test(url.pathname) : entry.path === url.pathname));
     if (fault) fault.count -= 1;
     if (fault?.when === 'before') return request.socket.destroy();
     try {
-      const result = await this.#route(request.method, url, body, key, header);
+      const result = await this.#route(request.method, url, body, key, header, authorization);
       if (fault) return request.socket.destroy();
       this.#send(response, result.status, result.body);
     } catch (error) {
@@ -182,7 +205,12 @@ export class FakeMem9 {
     response.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(body));
   }
 
-  async #route(method, url, body, key, header) {
+  #roleOf(key) {
+    if (!key) return null;
+    return this.keys.get(key)?.role ?? (this.spaces.has(key) ? 'space' : null);
+  }
+
+  async #route(method, url, body, key, header, authorization) {
     const path = url.pathname;
     let match;
     if (method === 'POST' && path === '/__test__/flush') {
@@ -191,9 +219,9 @@ export class FakeMem9 {
     }
     if (method === 'POST' && path === '/v1alpha1/mem9s') return this.#provision();
     if (method === 'GET' && path === '/v1alpha2/status') return this.#status(key);
-    if (method === 'POST' && path === '/v1alpha2/space-chains') return this.#createChain(body);
+    if (method === 'POST' && path === '/v1alpha2/space-chains') return this.#createChain(body, authorization);
     if (method === 'GET' && path === '/v1alpha2/space-chains/by-key') {
-      const chain = this.#chainFromKey(key);
+      const chain = this.#managementChain(key);
       return { status: 200, body: this.#publicChain(chain) };
     }
     if ((match = path.match(/^\/v1alpha2\/space-chains\/([^/]+)(\/.*)?$/))) {
@@ -220,38 +248,55 @@ export class FakeMem9 {
   #status(key) {
     if (!key) throw new HttpError(401, 'missing or malformed X-API-Key');
     if (key.startsWith('chain_')) {
-      const chainId = this.keys.get(key);
-      if (!chainId) throw new HttpError(404, 'key not found');
-      return { status: 200, body: { status: this.chains.get(chainId).deleted ? 'inactive' : 'active' } };
+      const entry = this.keys.get(key);
+      if (!entry) throw new HttpError(404, 'key not found');
+      return { status: 200, body: { status: this.chains.get(entry.chainId).deleted ? 'inactive' : 'active' } };
     }
     if (!this.spaces.has(key)) throw new HttpError(404, 'key not found');
     return { status: 200, body: { status: 'active' } };
   }
 
-  #createChain(body) {
-    this.#countCreating();
-    if (!body || typeof body.name !== 'string' || body.name === '') throw new HttpError(400, 'name: required');
-    const id = crypto.randomUUID();
-    const apiKey = `chain_${hex(20)}`;
-    const chain = { id, name: body.name, description: body.description ?? '', apiKey, deleted: false, nodes: [], webhooks: new Map(), createdAt: this.#timestamp() };
-    this.chains.set(id, chain);
-    this.keys.set(apiKey, id);
-    return {
-      status: 201,
-      body: { chain: this.#publicChain(chain), chain_api_key: apiKey, binding_id: crypto.randomUUID(), key_prefix: apiKey.slice(0, 12), key_preview: `${apiKey.slice(0, 12)}...${apiKey.slice(-4)}` },
-    };
+  #createChain(body, authorization) {
+    if (this.createSecret !== null && authorization !== `Bearer ${this.createSecret}`) {
+      throw new HttpError(401, 'missing or invalid Authorization bearer token');
+    }
+    const created = this.#newChain(body?.name, body?.description);
+    if (this.createWithOneKey) return { status: 201, body: { chain: created.chain, chain_api_key: created.management_binding.chain_api_key } };
+    return { status: 201, body: created };
   }
 
+  // Creates a Chain with its two keys. The response carries both keys, once.
+  #newChain(name, description) {
+    this.#countCreating();
+    if (typeof name !== 'string' || name === '') throw new HttpError(400, 'name: required');
+    const chain = { id: crypto.randomUUID(), name, description: description ?? '', deleted: false, nodes: [], webhooks: new Map(), createdAt: this.#timestamp() };
+    this.chains.set(chain.id, chain);
+    const binding = (role) => {
+      const apiKey = `chain_${hex(20)}`;
+      this.keys.set(apiKey, { chainId: chain.id, role });
+      return { id: crypto.randomUUID(), role, chain_api_key: apiKey };
+    };
+    return { chain: this.#publicChain(chain), management_binding: binding('management'), memory_binding: binding('memory') };
+  }
+
+  // Any key of a live chain, whatever its role.
   #chainFromKey(key) {
     if (!key || !key.startsWith('chain_')) throw new HttpError(401, 'missing or malformed X-API-Key');
-    const chainId = this.keys.get(key);
-    const chain = chainId && this.chains.get(chainId);
+    const entry = this.keys.get(key);
+    const chain = entry && this.chains.get(entry.chainId);
     if (!chain || chain.deleted) throw new HttpError(404, 'space chain not found');
+    return { chain, role: entry.role };
+  }
+
+  // Management routes take the management key only.
+  #managementChain(key) {
+    const { chain, role } = this.#chainFromKey(key);
+    if (role !== 'management') throw new HttpError(401, 'a Space Chain management key is required');
     return chain;
   }
 
   #chainAuth(chainId, key) {
-    const chain = this.#chainFromKey(key);
+    const chain = this.#managementChain(key);
     if (chain.id !== chainId) throw new HttpError(404, 'space chain not found');
     return chain;
   }
@@ -359,8 +404,8 @@ export class FakeMem9 {
   #resolveKey(key) {
     if (!key) throw new HttpError(400, 'missing API key');
     if (key.startsWith('chain_')) {
-      const chainId = this.keys.get(key);
-      const chain = chainId && this.chains.get(chainId);
+      const entry = this.keys.get(key);
+      const chain = entry && this.chains.get(entry.chainId);
       if (!chain || chain.deleted) throw new HttpError(400, 'invalid API key');
       if (chain.nodes.length === 0) throw new HttpError(400, 'Space Chain has no nodes.');
       return { chain, spaces: chain.nodes.map((node) => this.spaces.get(node.tenant_id)), owner: this.spaces.get(chain.nodes[0].tenant_id) };

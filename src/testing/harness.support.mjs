@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { FakeConsole } from './fake-console.support.mjs';
 import { FakeMem9 } from './fake-mem9.support.mjs';
 import { installStandins, searchPathFor } from './standins.support.mjs';
 import { killAllChildren, makeEnv, makeTempRoot, preflight, runCli, startProgram } from './run-cli.support.mjs';
@@ -11,17 +12,22 @@ export const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 export const ADMIN_LAUNCHER = path.join(REPO_ROOT, 'bin', 'sharedmem-admin');
 export const PARTICIPANT_LAUNCHER_NAME = path.join('bin', 'sharedmem-participant');
 
-export async function createHarness({ fake = true, fakeOptions } = {}) {
+// `withConsole` adds a fake Console (the mem9 Admin API) on top of the fake mem9; its
+// address, key and Project ID then go into every constructed environment. Without it no
+// Admin setting is passed, so a program creates Chains directly on the fake mem9.
+export async function createHarness({ fake = true, fakeOptions, withConsole = false, consoleOptions } = {}) {
   const root = makeTempRoot();
   const workdir = path.join(root, 'work');
   fs.mkdirSync(workdir, { recursive: true });
   const server = fake ? await new FakeMem9(fakeOptions).start() : null;
+  const fakeConsole = withConsole ? await new FakeConsole({ mem9: server, ...consoleOptions }).start() : null;
   const standins = installStandins(root);
   const logFile = path.join(root, 'standins.log');
   const harness = {
     root,
     workdir,
     fake: server,
+    console: fakeConsole,
     standins,
     logFile,
     cleaned: false,
@@ -34,7 +40,7 @@ export async function createHarness({ fake = true, fakeOptions } = {}) {
         STANDIN_SETUP_SOURCE: standins.setupSource,
         ...overrides.extra,
       };
-      const env = makeEnv({ root, serverUrl: server?.url, workdir, searchPath, extra });
+      const env = makeEnv({ root, serverUrl: server?.url, adminUrl: fakeConsole?.url, adminKey: fakeConsole?.adminKey, projectId: fakeConsole?.projectId, workdir, searchPath, extra });
       const merged = { ...env, ...Object.fromEntries(Object.entries(overrides).filter(([name]) => name !== 'extra')) };
       for (const [name, value] of Object.entries(merged)) if (value === undefined) delete merged[name];
       preflight(merged, { root, standinDir: standins.standinDir, scenario });
@@ -72,10 +78,10 @@ export async function createHarness({ fake = true, fakeOptions } = {}) {
     readState() {
       return JSON.parse(fs.readFileSync(path.join(workdir, 'state', 'state.json'), 'utf8'));
     },
-    // Plays a plugin: one user message written through a participant's Chain key, the
+    // Plays a plugin: one user message written through a participant's memory key, the
     // way a coding agent would, so routing and extraction run on the fake server.
     async say(person, content, { sync = true, agentId, tool = 'codex', sessionId = 'test-session' } = {}) {
-      const key = harness.readState().chains[person].key;
+      const key = harness.readState().chains[person].memoryKey;
       const response = await fetch(`${server.url}/v1alpha2/mem9s/memories`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-API-Key': key, 'X-Mnemo-Agent-Id': tool },
@@ -90,6 +96,7 @@ export async function createHarness({ fake = true, fakeOptions } = {}) {
       if (harness.cleaned) return;
       harness.cleaned = true;
       killAllChildren();
+      if (fakeConsole) await fakeConsole.stop();
       if (server) await server.stop();
       fs.rmSync(root, { recursive: true, force: true });
     },
@@ -103,6 +110,9 @@ export async function withHarness(t, options) {
   t.after(() => harness.cleanup());
   return harness;
 }
+
+// Both keys of every Chain recorded in a state, for assertions that no output or file leaks one.
+export const chainKeysOf = (state) => Object.values(state.chains).flatMap((chain) => [chain.managementKey, chain.memoryKey]);
 
 export const SMALL_CAST = [
   { name: 'lucia', role: 'leader' },

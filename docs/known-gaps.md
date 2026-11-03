@@ -7,10 +7,8 @@ What the demo does not do, or cannot guarantee. Read this before showing it to a
 1. **A webhook endpoint belongs to a Chain, not to one node.**
    - In the Approval Example a Leader Chain's receiver also receives deliveries for facts auto-routed to Leadership Shared, including their text.
    - The receiver acts only on deliveries that were held back (webhook-only).
-2. **Node modes govern routing only.** A Chain API key can read, update and delete Memories in every Space its Chain contains. The real boundary is which Spaces a Chain contains, not its Node modes.
-3. **Chain management uses the Chain API key**, the same key a person's plugin holds.
-   - A person could change the Routing prompts of their own Chain.
-   - There is no per-person authorization for Chain management.
+2. **Node modes govern routing only.** A memory key can read, update and delete Memories in every Space its Chain contains. The real boundary is which Spaces a Chain contains, not its Node modes.
+3. **A person's memory key cannot be revoked on its own.** A Chain has one memory key, and every `export` puts the same one in that person's Kit. To cut off a Kit that leaked, delete the Chains (`teardown`, and in the Console for Chains created through the Admin API) and run `init` and `export` again, which issues new keys.
 4. **Keys live in plain local files.** The state, the Candidates and every Kit are owner-only files with no encryption. This is a demo, not production hardening.
 5. **The server address may be plain HTTP**, so only fictional data is used.
 
@@ -47,7 +45,7 @@ What the demo does not do, or cannot guarantee. Read this before showing it to a
     - Codex plugin 0.2.7 supports the setting (checked on a real install).
     - The Participant program applies it when the installed plugin supports it and otherwise skips that step with a notice.
 17. **The Claude Code plugin provisions a new, empty Space by itself when it starts without a key**, so it must be started from the configured project directory.
-18. **Installing the Codex plugin changes the person's user-level Codex hook files** and stores the Chain's key in a user-level credentials file (`$MEM9_HOME/.credentials.json`, default `~/.mem9/`).
+18. **Installing the Codex plugin changes the person's user-level Codex hook files** and stores the person's memory key in a user-level credentials file (`$MEM9_HOME/.credentials.json`, default `~/.mem9/`).
     - The plugin creates that file readable by other users of the computer, so the Participant program restricts it to its owner.
     - Only the project override (the project settings) is project-local.
 19. **Codex runs the plugin's hooks only after the person trusts them, and the program cannot do that for the person.**
@@ -55,7 +53,7 @@ What the demo does not do, or cannot guarantee. Read this before showing it to a
     - Codex records the trust itself, in `~/.codex/config.toml` (one `[hooks.state]` entry per hook, with a hash of its definition). The only way around it is the flag `--dangerously-bypass-hook-trust`, which applies to one run, and the program does not use it.
     - The program prints the two answers to give, and the Participant guide explains how to trust later with `/hooks`. The plugin's own README does not mention this step.
     - Checked with Codex 0.162.1. Other versions may word the questions differently.
-20. **The Claude Code settings file holds the Chain key.**
+20. **The Claude Code settings file holds the memory key.**
     - `.claude/settings.local.json` in the project is made owner-only, but the program does not touch the project's `.gitignore`.
     - Check that the file is ignored before committing a project that was set up.
 21. **The automated tests do not cover real agent sessions or real HTTPS deliveries.**

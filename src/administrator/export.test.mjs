@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { REPO_ROOT, withHarness } from '../testing/harness.support.mjs';
+import { chainKeysOf, REPO_ROOT, withHarness } from '../testing/harness.support.mjs';
 
 const readConfig = (name) => JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'config', name), 'utf8'));
 const cases = new Map(readConfig('cases.json').cases.map((entry) => [entry.id, entry.sentence]));
@@ -73,23 +73,60 @@ test('the person file holds the Participant\'s details, owner-only', async (t) =
   assert.equal(person.role, 'developer');
   assert.equal(person.agentId, 'ana');
   assert.equal(person.serverUrl, state.serverUrl);
-  assert.equal(person.chainKey, state.chains.ana.key);
+  assert.equal(person.chainKey, state.chains.ana.memoryKey, 'the key in the Kit is the memory key');
+  assert.notEqual(person.chainKey, state.chains.ana.managementKey);
   assert.equal(person.example, 'basic');
   assert.equal(personOf(h, 'lucia').role, 'leader');
 });
 
-test('a Kit holds its own chain key and no other secret', async (t) => {
+test('a Kit holds its Participant\'s memory key and no other secret, above all no management key', async (t) => {
   const { h } = await exported(t);
   const state = h.readState();
   const spaceKeys = Object.values(state.spaces).map((space) => space.key);
+  const managementKeys = Object.values(state.chains).map((chain) => chain.managementKey);
   for (const name of ['ana', 'bruno', 'lucia']) {
-    const others = Object.entries(state.chains).filter(([owner]) => owner !== name).map(([, chain]) => chain.key);
+    const otherMemoryKeys = Object.entries(state.chains).filter(([owner]) => owner !== name).map(([, chain]) => chain.memoryKey);
     for (const file of filesIn(kitDir(h, name))) {
       const text = fs.readFileSync(path.join(kitDir(h, name), file), 'utf8');
-      for (const secret of [...others, ...spaceKeys]) assert.ok(!text.includes(secret), `${file} in the Kit of ${name} holds another secret`);
-      if (file !== 'person.json') assert.ok(!text.includes(state.chains[name].key), `${file} holds the key too`);
+      for (const secret of [...managementKeys, ...otherMemoryKeys, ...spaceKeys]) assert.ok(!text.includes(secret), `${file} in the Kit of ${name} holds another secret`);
+      if (file !== 'person.json') assert.ok(!text.includes(state.chains[name].memoryKey), `${file} holds the key too`);
     }
   }
+});
+
+test('a Kit and the report made from Chains created through the Admin API hold no management key, Admin API key or Project ID', async (t) => {
+  const h = await withHarness(t, { withConsole: true });
+  assert.equal((await h.admin(['init', '--yes'])).code, 0);
+  const result = await h.admin(['export']);
+  assert.equal(result.code, 0, result.output);
+  const state = h.readState();
+  assert.ok(Object.values(state.chains).every((chain) => chain.origin === 'admin-api'), 'the Chains were created through the fake Console');
+  const forbidden = [...Object.values(state.chains).map((chain) => chain.managementKey), h.console.adminKey, h.console.projectId, h.console.url];
+  const out = path.join(h.workdir, 'out');
+  const files = filesIn(out);
+  assert.equal(files.filter((file) => file.endsWith('/person.json')).length, 6, 'the scan covers every Kit');
+  assert.ok(files.includes('report.md'), 'and the report');
+  for (const file of files) {
+    const text = fs.readFileSync(path.join(out, file), 'utf8');
+    for (const secret of forbidden) assert.ok(!text.includes(secret), `${file} holds a secret that must stay with the Administrator`);
+  }
+  for (const name of Object.keys(state.chains)) assert.equal(personOf(h, name).chainKey, state.chains[name].memoryKey, name);
+  for (const secret of forbidden) assert.ok(!result.output.includes(secret), 'the command output holds no such secret either');
+});
+
+test('a Kit and the report hold no create secret, even when init used one', async (t) => {
+  const h = await withHarness(t);
+  const secret = 'the-create-secret-of-this-server';
+  h.fake.requireCreateSecret(secret);
+  const env = h.env({ SHAREDMEM_CREATE_SECRET: secret });
+  assert.equal((await h.admin(['init', '--yes'], { env })).code, 0);
+  const result = await h.admin(['export'], { env });
+  assert.equal(result.code, 0, result.output);
+  const out = path.join(h.workdir, 'out');
+  const files = filesIn(out);
+  assert.equal(files.filter((file) => file.endsWith('/person.json')).length, 6, 'the scan covers every Kit');
+  for (const file of files) assert.ok(!fs.readFileSync(path.join(out, file), 'utf8').includes(secret), `${file} holds the create secret`);
+  assert.ok(!result.output.includes(secret));
 });
 
 test('Sample sentences and questions follow the formula by role and position', async (t) => {
@@ -151,7 +188,7 @@ test('the report says who received which Kit and which Example is active, with n
     assert.ok(line.includes(`kits/${person.name}`), `${person.name}'s Kit folder is in the report`);
   }
   assert.match(report, /Approval/);
-  const secrets = [state.serverUrl, ...Object.values(state.chains).map((chain) => chain.key), ...Object.values(state.spaces).map((space) => space.key)];
+  const secrets = [state.serverUrl, ...chainKeysOf(state), ...Object.values(state.spaces).map((space) => space.key)];
   for (const secret of secrets) assert.ok(!report.includes(secret), 'no secret in the report');
 });
 
@@ -160,7 +197,7 @@ test('export prints where the Kits are and never prints a key or the server addr
   const state = h.readState();
   assert.match(result.stdout, /out\/kits/);
   assert.match(result.stdout, /secret/i, 'says that a Kit is a secret');
-  for (const secret of [state.serverUrl, ...Object.values(state.chains).map((chain) => chain.key)]) assert.ok(!result.output.includes(secret));
+  for (const secret of [state.serverUrl, ...chainKeysOf(state)]) assert.ok(!result.output.includes(secret));
 });
 
 test('re-exporting rebuilds everything from scratch', async (t) => {

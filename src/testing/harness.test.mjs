@@ -25,6 +25,28 @@ test('the preflight refuses a server address that is not on this machine', async
   assert.throws(() => preflight(env, { root: h.root, standinDir: h.standins.standinDir }), /does not point at the local machine/);
 });
 
+test('the preflight refuses an Admin API address that is not on this machine', async (t) => {
+  const h = await withHarness(t, { withConsole: true });
+  const env = { ...h.env(), SHAREDMEM_ADMIN_API_URL: 'https://console-api.example.com' };
+  assert.throws(() => preflight(env, { root: h.root, standinDir: h.standins.standinDir }), /Admin API address does not point at the local machine/);
+});
+
+test('the Admin API settings reach a program only when the test has a fake Console, and a test can drop each one', async (t) => {
+  const without = await withHarness(t);
+  const bare = without.env();
+  assert.deepEqual(Object.keys(bare).filter((name) => /^SHAREDMEM_(ADMIN|PROJECT|CREATE)/.test(name)), [], 'no Admin setting without a fake Console');
+
+  const h = await withHarness(t, { withConsole: true });
+  const env = h.env();
+  assert.equal(env.SHAREDMEM_ADMIN_API_URL, h.console.url);
+  assert.equal(env.SHAREDMEM_ADMIN_API_KEY, h.console.adminKey);
+  assert.equal(env.SHAREDMEM_PROJECT_ID, h.console.projectId);
+  assert.ok(!('SHAREDMEM_CREATE_SECRET' in env), 'a create secret is set only when a test asks for one');
+  const dropped = h.env({ SHAREDMEM_PROJECT_ID: undefined });
+  assert.ok(!('SHAREDMEM_PROJECT_ID' in dropped));
+  assert.equal(dropped.SHAREDMEM_ADMIN_API_KEY, h.console.adminKey);
+});
+
 test('the preflight refuses a home directory outside the test', async (t) => {
   const h = await withHarness(t);
   const env = { ...h.env(), HOME: '/somewhere/else' };

@@ -48,7 +48,7 @@ flowchart LR
 ## What you need
 
 - Node 22 or newer.
-- The address of a mem9 server that has the Space Chain API (the `server/` of [mem9-ai/mem9](https://github.com/mem9-ai/mem9) serves it under `/v1alpha2/space-chains`). The Administrator needs it; each Kit already carries it.
+- The address of a mem9 server that has the Space Chain API (the `server/` of [mem9-ai/mem9](https://github.com/mem9-ai/mem9) serves it under `/v1alpha2/space-chains`). The Administrator needs it; each Kit already carries it. To create Chains, `init` goes through the mem9 Admin API (the hosted mem9 service) or, on a mem9 server you run yourself, asks the server directly. See [Before you start](docs/administrator-guide.md#before-you-start).
 - Claude Code or Codex on each Participant's computer.
 
 > **Use fictional data only.** Every person and sentence in the demo is fictional, and a mem9 server may use plain HTTP, so never type anything real.
@@ -118,7 +118,7 @@ Give each person what they need to connect, and nothing else.
 `export` builds one Kit per person in `out/kits/<name>/`. A Kit holds:
 
 - the Participant program;
-- that person's own key;
+- that person's own memory key (the Administrator's management key never leaves the Administrator);
 - their sample sentences;
 - a guide.
 
@@ -165,7 +165,7 @@ See where the sentences ended up.
 ./bin/sharedmem-admin memories --as ana        # what one person sees through their Chain
 ```
 
-When the rehearsal is over, `./bin/sharedmem-admin teardown` deletes the Chains. The server cannot delete Spaces, so they and their Memories stay.
+When the rehearsal is over, `./bin/sharedmem-admin teardown` deletes the Chains, or tells you where to delete them. The server cannot delete Spaces, so they and their Memories stay.
 
 ## Tune the Routing prompts
 

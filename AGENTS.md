@@ -9,9 +9,11 @@ A demo of mem9 shared memory (Space Chains) for a small team. `sharedmem-admin` 
 
 ## Secrets
 
-- The server address lives only in the git-ignored `.env`. Keys and the address stay out of output (they are masked), the repository, test data and docs. Use fictional people and data.
+- The address of the server you use lives only in the git-ignored `.env`. Keys and the address stay out of output (they are masked), the repository, test data and docs; the docs name only the three public addresses of the hosted mem9 service. Use fictional people and data.
 - Files that hold keys (`state/`, Kits, person files) are written owner-only (mode 600) and stay out of git.
-- `src/docs.test.mjs` scans every file for common real-looking hosts, home-directory paths and key shapes. It catches the usual slips, not every one.
+- A Chain has a management key and a memory key. Only the Administrator program uses the management key, and it stays in `state/`; a Kit and every Participant program hold the memory key (the person file calls the field `chainKey`).
+- The Admin API address, key and Project ID and the create secret are read by `init` only, from `.env` or the shell. They are masked in output and never written to `state/` or a Kit.
+- `src/docs.test.mjs` scans every file for common real-looking hosts, home-directory paths, key shapes (including the Admin API key), `http://` addresses that are not this computer, and `mem9.ai` hosts other than the three public ones. It catches the usual slips, not every one.
 
 ## Architecture
 

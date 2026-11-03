@@ -92,8 +92,9 @@ export function findSystemTool(name) {
   return found;
 }
 
-// Builds the child environment from an allow-list; nothing is inherited.
-export function makeEnv({ root, serverUrl, workdir, searchPath, extra = {} }) {
+// Builds the child environment from an allow-list; nothing is inherited. The Admin API
+// settings and the create secret are passed in by the test, never read from anywhere.
+export function makeEnv({ root, serverUrl, adminUrl, adminKey, projectId, createSecret, workdir, searchPath, extra = {} }) {
   const home = path.join(root, 'home');
   const temporary = path.join(root, 'tmp');
   const gitTemplate = path.join(root, 'git-template');
@@ -123,6 +124,10 @@ export function makeEnv({ root, serverUrl, workdir, searchPath, extra = {} }) {
     ...extra,
   };
   if (serverUrl) env.SHAREDMEM_API_URL = serverUrl;
+  if (adminUrl) env.SHAREDMEM_ADMIN_API_URL = adminUrl;
+  if (adminKey) env.SHAREDMEM_ADMIN_API_KEY = adminKey;
+  if (projectId) env.SHAREDMEM_PROJECT_ID = projectId;
+  if (createSecret) env.SHAREDMEM_CREATE_SECRET = createSecret;
   if (workdir) env.SHAREDMEM_WORKDIR = workdir;
   return env;
 }
@@ -130,9 +135,10 @@ export function makeEnv({ root, serverUrl, workdir, searchPath, extra = {} }) {
 // Checks that the environment cannot touch anything outside the test.
 export function preflight(env, { root, standinDir, scenario = 'standins' }) {
   const problems = [];
-  if (env.SHAREDMEM_API_URL) {
-    const host = new URL(env.SHAREDMEM_API_URL).hostname;
-    if (host !== '127.0.0.1' && host !== 'localhost') problems.push('the server address does not point at the local machine');
+  for (const [name, label] of [['SHAREDMEM_API_URL', 'the server address'], ['SHAREDMEM_ADMIN_API_URL', 'the Admin API address']]) {
+    if (!env[name]) continue;
+    const host = new URL(env[name]).hostname;
+    if (host !== '127.0.0.1' && host !== 'localhost') problems.push(`${label} does not point at the local machine`);
   }
   for (const tool of ['claude', 'codex']) {
     const found = resolveOnPath(tool, env.PATH);

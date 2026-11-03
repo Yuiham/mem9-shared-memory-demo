@@ -34,14 +34,17 @@ Every person has their own Chain, named `sharedmem-demo-<name>`:
 
 Reading through a Chain merges what its Spaces hold, so a Developer sees their own Memories and the team's, while a Leader also sees Leadership Shared. Developers' Chains do not contain Leadership Shared, so they cannot read it.
 
-## Two kinds of keys
+## Keys
 
-| Key | Looks like | What it can do |
-| --- | --- | --- |
-| mem9 API key | a long hex string | Read and write one Space |
-| Chain API key | starts with `chain_` | Read and write through every Space in the Chain, and manage the Chain (nodes, routing rules, webhooks, deletion) |
+| Key | Looks like | Who holds it | What it can do |
+| --- | --- | --- | --- |
+| mem9 API key | a long hex string | The Administrator | Read and write one Space |
+| Management key | starts with `chain_` | The Administrator only | Manage the Chain: its nodes, routing rules, webhooks and deletion |
+| Memory key | starts with `chain_` | The person, in their Kit | Read and write Memories through every Space in the Chain |
 
-A person's Kit holds only their Chain API key. The Administrator holds every key in the state file. Keep both private.
+The server issues a Chain's two keys together, when it is created, and shows them once. A person's Kit holds only their memory key, so a person cannot change the nodes or Routing prompts of their own Chain. The Administrator holds every key in the state file. Keep all of them private.
+
+Two more secrets exist only to create Chains and are never stored by the demo: an Admin API key (the hosted mem9 service) and a create secret (a server that asks for one). [Before you start](administrator-guide.md#before-you-start) says which one you need.
 
 ## External space identifier
 
@@ -72,7 +75,7 @@ The demo uses three Routing prompts:
 
 Approval is a general Node mode and could apply to any node; the demo shows it only on the Team Shared node of Leader Chains.
 
-Node modes govern routing only. A Chain API key can read, update and delete Memories in every Space of its Chain, so the real boundary is which Spaces a Chain contains (see [Known gaps](known-gaps.md)).
+Node modes govern routing only. A memory key can read, update and delete Memories in every Space of its Chain, so the real boundary is which Spaces a Chain contains (see [Known gaps](known-gaps.md)).
 
 ## Examples
 

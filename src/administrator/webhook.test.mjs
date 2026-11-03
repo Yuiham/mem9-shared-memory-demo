@@ -34,6 +34,21 @@ test('webhook set registers one endpoint per Leader Chain, for routed-fact event
   assert.equal(creations(h).length, 2);
 });
 
+test('every webhook call is made with the management key of the Leader\'s Chain', async (t) => {
+  const h = await approvalDemo(t);
+  assert.equal((await h.admin(['webhook', 'set', '--url', PLACEHOLDER])).code, 0);
+  assert.equal((await h.admin(['webhook', 'set', '--url', PUBLIC_URL, '--test'])).code, 0);
+  assert.equal((await h.admin(['webhook', 'deliveries'])).code, 0);
+  const state = h.readState();
+  const calls = h.fake.requests.filter((request) => /\/webhooks|\/webhook-deliveries/.test(request.path));
+  assert.ok(calls.length >= 8, 'creation, update, test and the delivery listing were all made');
+  const managementKeys = ['lucia', 'marco'].map((leader) => state.chains[leader].managementKey);
+  for (const call of calls) {
+    assert.equal(call.role, 'management', `${call.method} ${call.path.split('/').pop()}`);
+    assert.ok(managementKeys.includes(call.key));
+  }
+});
+
 test('the signing secrets are stored in the state, and never printed', async (t) => {
   const h = await approvalDemo(t);
   const result = await h.admin(['webhook', 'set', '--url', PUBLIC_URL]);

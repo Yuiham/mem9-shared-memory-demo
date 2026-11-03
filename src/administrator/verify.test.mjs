@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { ANNOUNCEMENT, approvalDemo } from '../testing/approval.support.mjs';
-import { SHIPPED_ROUTING, withHarness } from '../testing/harness.support.mjs';
+import { chainKeysOf, SHIPPED_ROUTING, withHarness } from '../testing/harness.support.mjs';
 
 const MEMORIES = '/v1alpha2/mem9s/memories';
 
@@ -70,7 +70,8 @@ test('each Case is written through the first Chain of its speaker\'s role under 
     assert.equal(request.body.sync, true);
     assert.equal(request.header, 'sharedmem');
     const speaker = /-(L|W)\d$/.test(request.body.agent_id) ? 'lucia' : 'ana';
-    assert.equal(request.key, state.chains[speaker].key, `${request.body.agent_id} goes through ${speaker}`);
+    assert.equal(request.key, state.chains[speaker].memoryKey, `${request.body.agent_id} goes through the memory key of ${speaker}`);
+    assert.equal(request.role, 'memory');
   }
   assert.ok(agentIds.every((id) => !state.participants.some((person) => person.name === id)));
   const second = await h.admin(['verify']);
@@ -154,7 +155,7 @@ test('verify never prints a key or the server address, and its help says what it
   const h = await demo(t);
   const state = h.readState();
   const result = await h.admin(['verify']);
-  for (const secret of [...Object.values(state.spaces).map((space) => space.key), ...Object.values(state.chains).map((chain) => chain.key), h.fake.url]) {
+  for (const secret of [...Object.values(state.spaces).map((space) => space.key), ...chainKeysOf(state), h.fake.url]) {
     assert.ok(!result.output.includes(secret));
   }
   const help = await h.admin(['verify', '--help']);

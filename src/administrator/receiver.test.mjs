@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { ANNOUNCEMENT, approvalDemo, buildDelivery, post, waitFor } from '../testing/approval.support.mjs';
+import { chainKeysOf } from '../testing/harness.support.mjs';
 
 // ---- Candidates from real deliveries ------------------------------------------------
 
@@ -249,7 +250,7 @@ test('the output never shows a signing secret, a chain key or the server address
   await waitFor(() => /pending/.test(demo.process.output()) && /refused/.test(demo.process.output()), { what: 'both deliveries to be logged' });
   const state = demo.h.readState();
   const output = demo.process.output();
-  for (const secret of [state.serverUrl, ...Object.values(state.chains).map((chain) => chain.key), ...Object.values(state.webhooks).map((webhook) => webhook.secret)]) {
+  for (const secret of [state.serverUrl, ...chainKeysOf(state), ...Object.values(state.webhooks).map((webhook) => webhook.secret)]) {
     assert.ok(!output.includes(secret));
   }
 });

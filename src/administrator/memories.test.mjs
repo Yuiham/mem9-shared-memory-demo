@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { SHIPPED_ROUTING, withHarness } from '../testing/harness.support.mjs';
+import { chainKeysOf, SHIPPED_ROUTING, withHarness } from '../testing/harness.support.mjs';
 
 async function demo(t) {
   const h = await withHarness(t);
@@ -72,6 +72,23 @@ test('--as shows what one Participant sees through their Chain, with the Space e
   assert.match(withSessions.stdout, /session/);
 });
 
+test('--as reads with the Participant\'s memory key, as the Participant\'s plugin would, and a plain listing with Space keys', async (t) => {
+  const h = await demo(t);
+  const state = h.readState();
+  const before = h.fake.requestsTo('GET', '/v1alpha2/mem9s/memories').length;
+  assert.equal((await h.admin(['memories', '--as', 'ana', '--all-types'])).code, 0);
+  const asAna = h.fake.requestsTo('GET', '/v1alpha2/mem9s/memories').slice(before);
+  assert.ok(asAna.length >= 2, 'the long-term types and the sessions are listed');
+  for (const request of asAna) {
+    assert.equal(request.key, state.chains.ana.memoryKey);
+    assert.equal(request.role, 'memory');
+  }
+  const mark = h.fake.requestsTo('GET', '/v1alpha2/mem9s/memories').length;
+  assert.equal((await h.admin(['memories', '--space', 'team-shared'])).code, 0);
+  const plain = h.fake.requestsTo('GET', '/v1alpha2/mem9s/memories').slice(mark);
+  assert.ok(plain.length > 0 && plain.every((request) => request.role === 'space'));
+});
+
 test('unknown names, conflicting options and a missing state are explained', async (t) => {
   const h = await demo(t);
   const unknown = await h.admin(['memories', '--space', 'nobody']);
@@ -96,7 +113,7 @@ test('memories never prints a key or the server address', async (t) => {
   const h = await demo(t);
   await h.say('ana', 'We always run database migrations before deploying the API.');
   const state = h.readState();
-  const secrets = [...Object.values(state.spaces).map((space) => space.key), ...Object.values(state.chains).map((chain) => chain.key), h.fake.url];
+  const secrets = [...Object.values(state.spaces).map((space) => space.key), ...chainKeysOf(state), h.fake.url];
   for (const args of [[], ['--all-types'], ['--space', 'team-shared'], ['--as', 'ana', '--all-types']]) {
     const result = await h.admin(['memories', ...args]);
     for (const secret of secrets) assert.ok(!result.output.includes(secret), `leak in memories ${args.join(' ')}`);

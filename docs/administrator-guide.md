@@ -13,6 +13,12 @@ The Administrator prepares the environment on a mem9 server, checks the routing,
   - A variable already set in your shell wins over the file.
   - The address is masked in all output. Besides `.env`, it is stored in `state/state.json` and in each Kit's `person.json`.
   - If it starts with `http://`, the programs warn once per run: traffic is not encrypted, so use fictional data only.
+- **A way to create Chains.**
+  - The hosted mem9 service (`https://api.mem9.ai`): `init` creates Chains through the mem9 Admin API. In the [mem9 Console](https://mem9.ai/console), create a Project that you keep only for this demo (a Space cannot be deleted while any Chain in its Project has a node without an external space identifier, and the first node of every demo Chain is like that; Settings, Project, Overview shows the Project ID) and an Admin API key with the `space-chains:write` scope (Settings, User, Admin API keys, Create key). The key owner must be an owner or admin of the organization. Then add to `.env`: `SHAREDMEM_ADMIN_API_URL` (`https://console-api.mem9.ai`), `SHAREDMEM_ADMIN_API_KEY` (the key) and `SHAREDMEM_PROJECT_ID` (the Project ID). All three or none: with only some of them `init` stops and names the missing ones.
+  - A mem9 server you run yourself: set only `SHAREDMEM_API_URL`, and `init` creates Chains directly on the server. If you turned on the server's create secret (`MNEMO_SPACE_CHAIN_CREATE_SECRET_REQUIRED`), also set `SHAREDMEM_CREATE_SECRET` to that secret. It is sent as a Bearer credential with the call that creates a Chain; without it the call carries none, and the server decides.
+  - Only `init` reads these settings. A variable in your shell wins over `.env`. They are masked in all output and never written to `state/` or to a Kit. If an address starts with `http://`, `init` warns once about it, and the warning names the key or secret that would be sent unencrypted.
+  - Each Chain has a management key, which only you hold, and a memory key, which goes into the person's Kit. See [Concepts](concepts.md#keys).
+  - A Chain created through the Admin API is registered in the Console, so delete it there: `teardown` only forgets it.
 - **The state file.** `state/state.json` (created by `init`) records every key. Treat it as a secret and do not lose it (see [Troubleshooting](troubleshooting.md#i-lost-the-state-file)).
 
 ## A typical rehearsal
@@ -75,23 +81,24 @@ The rules:
 | `receiver serve` | Receive the server's deliveries | Local: `state/candidates.json` and `state/receiver.json` |
 | `candidates` | List, approve or reject announcements | `list`: nothing. `approve`: a pinned Memory in Team Shared, and `state/candidates.json`. `reject`: `state/candidates.json` |
 | `simulate` | Show approval without a public address | Local: the receiver stores a simulated Candidate in `state/candidates.json` |
-| `teardown` | Delete the Chains | Server: the Chains. Local: removes them from `state/state.json` |
+| `teardown` | Delete the Chains | Server: the Chains created directly on the server (a Chain created through the Admin API is left for you to delete in the Console). Local: removes all Chains from `state/state.json` |
 
 ### `init`
 
 Creates or reuses the whole environment:
 
 - one Personal space per person, plus Team Shared and Leadership Shared;
-- one Chain per person;
+- one Chain per person, with its management key and its memory key;
 - the routing rules for the chosen Example;
 - the Seed memories.
 
-Before any server call it validates the cast, the Example and the length of every Routing prompt. Then it shows its plan and asks. `--yes` skips the question; without a terminal and without `--yes` it fails and says so.
+Before any server call it validates the cast, the Example and the length of every Routing prompt. Then it shows its plan, including whether Chains are created through the Admin API or directly on the server, and asks. `--yes` skips the question; without a terminal and without `--yes` it fails and says so.
 
 - `--example basic|approval` chooses the Example. The first run defaults to Basic; a re-run without the flag keeps the recorded one.
-- Safe to re-run: what exists is reused. A Chain whose nodes already match keeps them, and only routing rules that differ are updated. A Chain the server no longer knows is created again on the same Spaces; its key changes, so export the Kits again.
+- Safe to re-run: what exists is reused. A Chain whose nodes already match keeps them, and only routing rules that differ are updated. A Chain the server no longer knows is created again on the same Spaces; its keys change, so export the Kits again. A re-run that creates no Chain needs none of the settings from [Before you start](#before-you-start).
 - The server does not show which Space a node points at, so `init` records the node ids and the mem9 API keys it wrote in `state/state.json` and compares against that record. A node replaced on the server by another tool, or a Space provisioned again under the same name, makes `init` set that Chain's nodes again. A state written by an earlier version has no record: the first `init` sets every Chain's nodes once and keeps the routing rules, and the run after that changes nothing.
 - Switching Examples changes one routing rule in place. Chains and keys stay the same, so Kits already handed out keep connecting. Run `export` again to refresh the Example label inside them.
+- A `state/` written by an earlier version of the demo is refused, because it holds a single key per Chain. Move the folder out of the repository, or delete it; do not rename it inside the repository, where git would pick up the keys. The Chains and Spaces it created stay on the server.
 - It warns when you apply Approval with no webhook registered, because announcements would be lost.
 
 ### `verify`
@@ -100,7 +107,7 @@ Sends every Case (a sample sentence with where it should land) through the real 
 
 How it checks a Case:
 
-- It writes the Case through the Chain of the first person with the speaker's role, under its own Agent ID `verify-<run>-<case>`, using the server's synchronous write.
+- It writes the Case through the memory key of the first person with the speaker's role, under its own Agent ID `verify-<run>-<case>`, using the server's synchronous write.
 - It reads back the speaker's Personal space, Team Shared and Leadership Shared.
 - Afterwards it removes everything it wrote, of every Memory type.
 
@@ -125,7 +132,7 @@ Shows where Memories landed.
 
 - No options: every space with its Memory counts.
 - `--space <name>` (`team-shared`, `leadership-shared`, or a person's name for their Personal space): that space's Memories with their Agent IDs.
-- `--as <person>`: the merged view through that person's Chain, with the space each Memory came from.
+- `--as <person>`: the merged view through that person's Chain, read with their memory key, with the space each Memory came from.
 - Only long-term Memories (pinned and insight) are listed. `--all-types` adds session Memories, the raw conversation.
 
 ### `export`
@@ -135,10 +142,10 @@ Builds `out/kits/<name>/` for every person and `out/report.md` (who gets which K
 A Kit contains:
 
 - the Participant program and the code it needs;
-- `person.json` (owner-only): the person's name, role, server address, own chain key, Agent ID, sample sentences, sample question with what it should find, and the Example at export time;
+- `person.json` (owner-only): the person's name, role, server address, own memory key (in the field `chainKey`), Agent ID, sample sentences, sample question with what it should find, and the Example at export time;
 - `README.md`: the [Participant guide](participant-guide.md).
 
-A Kit never contains tests, administrator code or anyone else's key. **A Kit is a secret.** Send each person only their own, for example as a zip.
+A Kit never contains tests, administrator code, a management key or anyone else's key. **A Kit is a secret.** Send each person only their own, for example as a zip.
 
 ### `webhook set --url <address> [--test]`
 
@@ -195,6 +202,9 @@ Posts a correctly signed delivery to the running receiver, as if the server had 
 ### `teardown`
 
 Deletes the Chains this demo created, after listing them and asking (`--yes` skips the question). Spaces and their Memories remain, because the server cannot delete Spaces. The state keeps their keys, so a later `init` reuses them.
+
+- A Chain that `init` created directly on the server is deleted there, with its management key.
+- A Chain that `init` created through the Admin API is registered in the Console, so `teardown` does not delete it on the server: the Console could then no longer delete it. `teardown` lists these Chains separately, forgets them in `state/state.json` and leaves them for you to delete in the Console. Until you do, `init` cannot create a Chain with the same name in the same Project, and says so.
 
 ## Receiving real deliveries
 

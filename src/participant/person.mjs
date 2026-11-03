@@ -1,5 +1,5 @@
 // The person file: everything a Kit knows about its Participant. It sits at the root of
-// the Kit and holds the Participant's chain API key, so it is a secret.
+// the Kit and holds the Participant's memory key (in the field `chainKey`), so it is a secret.
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { CliError } from '../shared/cli.mjs';

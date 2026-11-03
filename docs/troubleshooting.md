@@ -17,7 +17,11 @@ The state records the server it was created for, and every command refuses to ru
 A Chain or Space key in the state is not known to the server. The usual causes:
 
 - The state file comes from another server.
-- A Chain was deleted on the server. Running `init` creates it again on the same Spaces; its key changes, so run `export` again and hand out the new Kits.
+- A Chain was deleted on the server. Running `init` creates it again on the same Spaces; its keys change, so run `export` again and hand out the new Kits.
+
+### A Chain with this name already exists in the Project (409)
+
+A Chain created through the Admin API is registered in the Console, and its name (`sharedmem-demo-<name>`) stays taken in the Project until the Chain is deleted there. You meet this after `teardown`, which only forgets such Chains, or after a Chain was deleted on the mem9 server but not in the Console. Delete the Chain of that name in the mem9 Console, then run `init` again. Nothing that `init` created before is lost.
 
 ### `Cannot reach the mem9 server`
 

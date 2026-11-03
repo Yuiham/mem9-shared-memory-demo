@@ -4,7 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { approvalDemo } from '../testing/approval.support.mjs';
 import { FakeMem9 } from '../testing/fake-mem9.support.mjs';
-import { SMALL_CAST, withHarness } from '../testing/harness.support.mjs';
+import { chainKeysOf, SMALL_CAST, withHarness } from '../testing/harness.support.mjs';
 
 const PROVISION = '/v1alpha1/mem9s';
 const CREATE_CHAIN = '/v1alpha2/space-chains';
@@ -44,6 +44,22 @@ test('init builds the default cast: eight Spaces, six Chains, the shared nodes a
   assert.equal(nodesOf(fake, 'lucia')[1].tenant_id, state.spaces['leadership-shared'].key);
 });
 
+test('init manages each Chain with its management key, and writes the Seed memories with Space keys', async (t) => {
+  const { h } = await initialized(t);
+  const state = h.readState();
+  const managementKeys = Object.values(state.chains).map((chain) => chain.managementKey);
+  const chainCalls = h.fake.requests.filter((request) => request.path.startsWith('/v1alpha2/space-chains/'));
+  assert.ok(chainCalls.length >= 18, 'a lookup and the nodes of every Chain, and the policies');
+  for (const call of chainCalls) {
+    assert.equal(call.role, 'management', `${call.method} ${call.path.replace(/[0-9a-f-]{36}/, '<id>')}`);
+    assert.ok(managementKeys.includes(call.key));
+  }
+  const writes = h.fake.requestsTo('POST', '/v1alpha2/mem9s/memories');
+  assert.equal(writes.length, 5);
+  assert.ok(writes.every((request) => request.role === 'space'));
+  assert.ok(h.fake.requests.every((request) => request.role !== 'memory'), 'init never uses a memory key');
+});
+
 test('init writes the five Seed memories as pinned memories under the seed Agent ID, and only once', async (t) => {
   const { h } = await initialized(t);
   const state = h.readState();
@@ -69,8 +85,8 @@ test('the state file is owner-only with an owner-only backup, and no output show
   assert.equal(fs.statSync(`${file}.bak`).mode & 0o777, 0o600);
   assert.equal(fs.statSync(path.dirname(file)).mode & 0o777, 0o700);
   const state = h.readState();
-  const secrets = [...Object.values(state.spaces).map((space) => space.key), ...Object.values(state.chains).map((chain) => chain.key), h.fake.url, new URL(h.fake.url).host];
-  assert.ok(secrets.length >= 14);
+  const secrets = [...Object.values(state.spaces).map((space) => space.key), ...chainKeysOf(state), h.fake.url, new URL(h.fake.url).host];
+  assert.ok(secrets.length >= 22, 'eight Space keys, twelve Chain keys, the address and the host');
   for (const secret of secrets) assert.ok(!result.output.includes(secret), 'output leaked a secret');
   assert.deepEqual(fs.readdirSync(path.dirname(file)).filter((name) => name.endsWith('.tmp')), [], 'no temporary files are left behind');
 });
@@ -104,7 +120,7 @@ test('re-running init changes nothing and keeps every key', async (t) => {
   assert.ok(!second.stdout.includes('policys'), 'the plural is spelled correctly');
 });
 
-test('switching Examples changes only the Leaders\' Team Shared node and keeps every chain key', async (t) => {
+test('switching Examples changes only the Leaders\' Team Shared node and keeps both keys of every Chain', async (t) => {
   const { h } = await initialized(t);
   const before = h.readState();
   const nodePuts = h.count('PUT', /\/nodes$/);
@@ -118,7 +134,10 @@ test('switching Examples changes only the Leaders\' Team Shared node and keeps e
   for (const name of ['ana', 'bruno', 'carla', 'diego']) assert.equal(policyOf(nodesOf(h.fake, name)[1]).prompt, readPrompt('team-shared-auto'));
   const after = h.readState();
   assert.equal(after.example, 'approval');
-  for (const name of Object.keys(before.chains)) assert.equal(after.chains[name].key, before.chains[name].key);
+  for (const name of Object.keys(before.chains)) {
+    assert.equal(after.chains[name].managementKey, before.chains[name].managementKey);
+    assert.equal(after.chains[name].memoryKey, before.chains[name].memoryKey);
+  }
 
   const kept = await h.admin(['init', '--yes']);
   assert.equal(kept.code, 0, kept.output);
@@ -230,7 +249,8 @@ test('a Chain the server no longer knows is created again on the same Spaces', a
   const result = await h.admin(['init', '--yes']);
   assert.equal(result.code, 0, result.output);
   const after = h.readState();
-  assert.notEqual(after.chains.ana.key, before.chains.ana.key);
+  assert.notEqual(after.chains.ana.managementKey, before.chains.ana.managementKey);
+  assert.notEqual(after.chains.ana.memoryKey, before.chains.ana.memoryKey);
   assert.equal(after.chains.ana.id === before.chains.ana.id, false);
   assert.equal(after.spaces.ana.key, before.spaces.ana.key);
   assert.equal(h.fake.spaceIds().length, 8);
@@ -331,7 +351,8 @@ test('nodes that drifted on the server are set again together with their policie
   const after = h.readState();
   assert.equal(after.chains.ana.nodes[1].id, nodesOf(h.fake, 'ana')[1].id);
   assert.notEqual(after.chains.ana.nodes[1].id, before.chains.ana.nodes[1].id);
-  assert.equal(after.chains.ana.key, before.chains.ana.key);
+  assert.equal(after.chains.ana.managementKey, before.chains.ana.managementKey);
+  assert.equal(after.chains.ana.memoryKey, before.chains.ana.memoryKey);
 });
 
 // The server does not return a node's Space key, so init remembers which key it wrote.
@@ -503,6 +524,31 @@ test('a state file that is not valid JSON is refused by every command and left u
     assert.match(result.stderr, /\.bak/, `${args[0]} names the backup`);
   }
   assert.equal(fs.readFileSync(file, 'utf8'), '{ broken');
+});
+
+test('a state written by the previous version is refused by every command, with the three things to know', async (t) => {
+  const { h } = await initialized(t);
+  const file = path.join(h.workdir, 'state', 'state.json');
+  const state = h.readState();
+  // What the previous version wrote: one key per Chain and version 1.
+  const previous = {
+    ...state,
+    version: 1,
+    chains: Object.fromEntries(Object.entries(state.chains).map(([name, chain]) => [name, { id: chain.id, name: chain.name, key: chain.managementKey, nodes: chain.nodes }])),
+  };
+  fs.writeFileSync(file, JSON.stringify(previous));
+  const requests = h.fake.requests.length;
+  for (const args of [['init', '--yes'], ['memories'], ['export'], ['verify'], ['teardown', '--yes']]) {
+    const result = await h.admin(args);
+    assert.equal(result.code, 1, args[0]);
+    assert.match(result.stderr, /written by an earlier version/, `${args[0]}: what the state is`);
+    assert.match(result.stderr, /next: Move the state folder out of the repository, or delete it, before you run this version/, `${args[0]}: what to do first`);
+    assert.match(result.stderr, /not deleted/, `${args[0]}: what is left behind`);
+    assert.match(result.stderr, /not rename it inside the repository/, `${args[0]}: why a rename in place is no answer`);
+    assert.ok(!chainKeysOf(state).some((secret) => result.output.includes(secret)), `${args[0]}: no key in the output`);
+  }
+  assert.equal(h.fake.requests.length, requests, 'nothing was sent to the server');
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).version, 1, 'the state is left as it was');
 });
 
 test('a state file of the wrong version is refused with a next step', async (t) => {

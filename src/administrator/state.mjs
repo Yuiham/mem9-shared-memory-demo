@@ -4,7 +4,9 @@ import path from 'node:path';
 import { CliError } from '../shared/cli.mjs';
 import { readJson, writeJsonWithBackup } from '../shared/fsx.mjs';
 
-export const STATE_VERSION = 1;
+// Version 2 records two keys for each Chain: the management key the Administrator keeps
+// and the memory key a Kit carries.
+export const STATE_VERSION = 2;
 
 export class StateStore {
   constructor({ workdir, serverUrl, io }) {
@@ -19,9 +21,14 @@ export class StateStore {
   load() {
     const state = readJson(this.file, { label: 'state' });
     if (!state) return null;
+    if (state.version === 1) {
+      throw new CliError(`The state in this working directory was written by an earlier version of this demo (state version 1; this version reads version ${STATE_VERSION}).`, {
+        next: 'Move the state folder out of the repository, or delete it, before you run this version; do not rename it inside the repository, because git would pick up the keys in it. The Chains and Spaces the earlier version created are not deleted: they stay on the server.',
+      });
+    }
     if (state.version !== STATE_VERSION) {
       throw new CliError(`The state file has version ${state.version}, but this program writes version ${STATE_VERSION}.`, {
-        next: 'Use the version of the demo that created the state, or move the state folder aside to start again.',
+        next: 'Use the version of the demo that created the state, or move the state folder out of the repository (or delete it) to start again.',
       });
     }
     if (state.serverUrl !== this.serverUrl) {
@@ -48,7 +55,10 @@ export class StateStore {
   #register() {
     const { redactor } = this.io;
     for (const space of Object.values(this.state.spaces)) redactor.addSecret(space.key);
-    for (const chain of Object.values(this.state.chains)) redactor.addSecret(chain.key);
+    for (const chain of Object.values(this.state.chains)) {
+      redactor.addSecret(chain.managementKey);
+      redactor.addSecret(chain.memoryKey);
+    }
     for (const webhook of Object.values(this.state.webhooks)) redactor.addSecret(webhook.secret);
   }
 }

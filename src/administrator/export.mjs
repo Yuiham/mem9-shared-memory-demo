@@ -18,8 +18,8 @@ const HELP = {
   changes: [
     'On the server: nothing. This command only reads the local state.',
     'Locally: removes out/kits/ and out/report.md, then writes out/kits/<name>/ for every Participant and out/report.md. Everything is rebuilt from scratch; other files in out/ stay.',
-    'A Kit holds the Participant program, the code it needs, a person file (owner-only) with that person\'s name, role, server address, chain API key, Agent ID, Sample sentences, Sample question and the active Example, and a README. It never holds tests, administrator code or another person\'s key.',
-    'A Kit is a secret: it holds a chain API key. The report holds no secret.',
+    'A Kit holds the Participant program, the code it needs, a person file (owner-only) with that person\'s name, role, server address, memory key, Agent ID, Sample sentences, Sample question and the active Example, and a README. It never holds tests, administrator code, a management key or another person\'s key.',
+    'A Kit is a secret: it holds a memory key. The report holds no secret.',
   ],
   options: OPTIONS,
   examples: [
@@ -89,7 +89,7 @@ function reportText({ state, kits, exportedAt }) {
     '| --- | --- | --- | --- | --- |',
     ...kits.map((kit) => `| ${kit.name} | ${ROLE_LABEL[kit.role]} | ${kit.name} | ${kit.folder} | [ ] |`),
     '',
-    'Each Kit holds one person\'s chain API key, so it is a secret. Hand it only to that person.',
+    'Each Kit holds one person\'s memory key, so it is a secret. Hand it only to that person.',
     'The Example named inside a Kit is a label for the guidance. After switching Examples with `init`, run `export` again to refresh it; the keys do not change.',
     '',
   ];
@@ -134,7 +134,9 @@ export async function run(argv, { io, env, program }) {
       role: person.role,
       agentId: person.name,
       serverUrl: state.serverUrl,
-      chainKey: state.chains[person.name].key,
+      // The field keeps its name so Kits and the Participant program stay as they are; it
+      // holds the memory key. The management key never leaves the state.
+      chainKey: state.chains[person.name].memoryKey,
       example: state.example,
       ...samples.get(person.name),
     });
@@ -146,7 +148,7 @@ export async function run(argv, { io, env, program }) {
   for (const kit of kits) io.out(`  - ${kit.name} (${ROLE_LABEL[kit.role]})  out/${kit.folder}`);
   io.out('Report: out/report.md');
   io.out('');
-  io.out('Each Kit holds one person\'s chain API key, so a Kit is a secret: hand it only to that person.');
+  io.out('Each Kit holds one person\'s memory key, so a Kit is a secret: hand it only to that person.');
   io.out(`Next step: ${HELP.next.replace(/^Send/, 'send')}`);
   return 0;
 }

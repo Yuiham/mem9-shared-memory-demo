@@ -124,7 +124,7 @@ async function runCase({ ctx, testCase, example, runId, waitMs, written }) {
   written.push(result);
   try {
     const seen = wantsCandidate ? await deliveryIds(mem9, store.state.chains[speaker.name]) : null;
-    await mem9.writeMessages(store.state.chains[speaker.name].key, {
+    await mem9.writeMessages(store.state.chains[speaker.name], {
       messages: [{ role: 'user', content: testCase.sentence }],
       agentId,
       sessionId: agentId,

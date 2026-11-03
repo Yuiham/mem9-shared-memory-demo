@@ -99,8 +99,9 @@ async function listAs({ ctx, person, types }) {
     if (!external) return 'unknown';
     return SHARED_SPACES.includes(external) ? displayName(external) : external;
   };
-  const pages = [await mem9.listPage(chain.key)];
-  if (!types.every((type) => LONG_TERM.includes(type))) pages.push(await mem9.listPage(chain.key, { memory_type: 'session' }));
+  // The memory key, as the Participant's plugin would read: what this person sees.
+  const pages = [await mem9.listPage(chain.memoryKey)];
+  if (!types.every((type) => LONG_TERM.includes(type))) pages.push(await mem9.listPage(chain.memoryKey, { memory_type: 'session' }));
   const rows = pages.flatMap((page) => page.memories);
   const total = pages.reduce((sum, page) => sum + page.total, 0);
   io.out(`What ${person} sees through their Chain: ${rows.length} of ${total} Memories shown (${types.join(', ')}).`);

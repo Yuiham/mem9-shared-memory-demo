@@ -1,5 +1,10 @@
 // The mem9 server operations the Administrator program needs, one function each, so
 // commands read as intentions and the request shapes live in one place.
+//
+// A Chain has two keys. Everything that manages it (reading it, nodes, routing policy,
+// webhooks, deleting it) uses its management key; writing and reading Memories the way a
+// Participant's plugin does uses its memory key. The functions take the Chain's state
+// entry and pick the key themselves, so a command cannot use the wrong one by accident.
 const ROOT = '/v1alpha2';
 
 export function createMem9(api) {
@@ -12,56 +17,60 @@ export function createMem9(api) {
     async provisionSpace() {
       return (await api.request('POST', '/v1alpha1/mem9s')).id;
     },
-    createChain(name, description) {
-      return api.request('POST', `${ROOT}/space-chains`, { body: { name, description } });
+    // Creates a Chain directly on the server. A server with its create gate on wants the
+    // create secret as a Bearer credential; one without ignores it. The answer carries
+    // both keys, once.
+    createChain(name, description, { secret } = {}) {
+      return api.request('POST', `${ROOT}/space-chains`, { bearer: secret, body: { name, description } });
     },
-    chainByKey(chainKey) {
-      return api.request('GET', `${ROOT}/space-chains/by-key`, { key: chainKey });
+    chainByKey(managementKey) {
+      return api.request('GET', `${ROOT}/space-chains/by-key`, { key: managementKey });
     },
     async setNodes(chain, nodes) {
-      return (await api.request('PUT', chainPath(chain, '/nodes'), { key: chain.key, body: { nodes } })).nodes;
+      return (await api.request('PUT', chainPath(chain, '/nodes'), { key: chain.managementKey, body: { nodes } })).nodes;
     },
     setRoutingPolicy(chain, nodeId, { enabled, prompt, webhookOnly }) {
       return api.request('PUT', chainPath(chain, `/nodes/${nodeId}/routing-policy`), {
-        key: chain.key,
+        key: chain.managementKey,
         body: { enabled, prompt, webhook_only: webhookOnly },
       });
     },
     deleteChain(chain) {
-      return api.request('DELETE', chainPath(chain), { key: chain.key });
+      return api.request('DELETE', chainPath(chain), { key: chain.managementKey });
     },
     // One Memory written word for word; through a Space key it lands in that Space.
     writePinned(spaceKey, { text, agentId, tags }) {
       return api.request('POST', `${ROOT}/mem9s/memories`, { key: spaceKey, body: { content: text, memory_type: 'pinned', agent_id: agentId, tags } });
     },
-    // One user message per call, written through a Chain key the way a plugin would.
-    // The synchronous option returns after extraction and routing have finished.
-    writeMessages(chainKey, { messages, agentId, sessionId }) {
+    // One user message per call, written through a Chain's memory key the way a plugin
+    // would. The synchronous option returns after extraction and routing have finished.
+    writeMessages(chain, { messages, agentId, sessionId }) {
       return api.request('POST', `${ROOT}/mem9s/memories`, {
-        key: chainKey,
+        key: chain.memoryKey,
         body: { messages, agent_id: agentId, session_id: sessionId, sync: true },
         timeoutMs: 600000,
       });
     },
-    // Webhook endpoints belong to a Chain and are managed with its key. The signing
-    // secret comes back only from creation (and rotation).
+    // Webhook endpoints belong to a Chain and are managed with its management key. The
+    // signing secret comes back only from creation (and rotation).
     createWebhook(chain, { name, url, events }) {
-      return api.request('POST', chainPath(chain, '/webhooks'), { key: chain.key, body: { name, url, events } });
+      return api.request('POST', chainPath(chain, '/webhooks'), { key: chain.managementKey, body: { name, url, events } });
     },
     updateWebhook(chain, webhookId, changes) {
-      return api.request('PATCH', chainPath(chain, `/webhooks/${webhookId}`), { key: chain.key, body: changes });
+      return api.request('PATCH', chainPath(chain, `/webhooks/${webhookId}`), { key: chain.managementKey, body: changes });
     },
     async testWebhook(chain, webhookId) {
-      return (await api.request('POST', chainPath(chain, `/webhooks/${webhookId}/test`), { key: chain.key })).delivery;
+      return (await api.request('POST', chainPath(chain, `/webhooks/${webhookId}/test`), { key: chain.managementKey })).delivery;
     },
     async webhookDeliveries(chain, limit) {
-      return (await api.request('GET', chainPath(chain, '/webhook-deliveries'), { key: chain.key, query: { limit } })).deliveries ?? [];
+      return (await api.request('GET', chainPath(chain, '/webhook-deliveries'), { key: chain.managementKey, query: { limit } })).deliveries ?? [];
     },
     deleteMemories(key, ids) {
       // Deleting the same ids again changes nothing, so a cut connection may be retried.
       return api.request('POST', `${ROOT}/mem9s/memories/batch-delete`, { key, body: { ids }, retry: true });
     },
-    // A page of Memories and the total the server counts for the same filter.
+    // A page of Memories and the total the server counts for the same filter. `key` is a
+    // Space key, or a Chain's memory key to see what that Chain's Participant sees.
     listPage,
     async listMemories(key, query = {}) {
       return (await listPage(key, query)).memories;
